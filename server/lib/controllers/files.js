@@ -2768,7 +2768,7 @@ export const moveTrash = async (req, res, next) => {
     }
 
     res.status(400).json({
-      status: { success: false, errors }
+      status: { success: false, message: "ゴミ箱への移動に失敗しました", errors }
     });
 
   }

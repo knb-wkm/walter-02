@@ -63,7 +63,6 @@ describe('lib/controllers/metaInfos', () => {
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
-        console.log(res_body)
         expect(res_body.body.name).toBe(req.body.metainfo.name) //nameが一致する
         expect(res_body.body.label).toBe(req.body.metainfo.label) //labelが一致する
       }
