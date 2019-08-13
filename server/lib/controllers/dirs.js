@@ -220,7 +220,6 @@ export const tree = async (req, res, next) => {
 };
 
 export const create = async (req, res, next) => {
-  //  co(function*(){
   try {
     const { dir_name } = req.body;
     let dir_id = req.body.dir_id;
@@ -385,7 +384,6 @@ export const create = async (req, res, next) => {
 
   } catch (e) {
     let errors = {};
-    console.log(e)
     switch (e) {
       case "dir_id is empty":
         errors.dir_id = "フォルダIDが空のためフォルダの作成に失敗しました";
@@ -418,11 +416,9 @@ export const create = async (req, res, next) => {
       }
     });
   }
-  //  });
 };
 
 export const move = async (req, res, next) => {
-  //  co(function* () {
   try {
     const moving_id = mongoose.Types.ObjectId(req.params.moving_id);  // 対象
     const destination_id = mongoose.Types.ObjectId(req.body.destinationDir._id);  // 行き先
@@ -496,23 +492,6 @@ export const move = async (req, res, next) => {
       await esClient.createIndex(res.user.tenant_id, [updatedFile]);
     }
 
-    // // フォルダ権限を移動先フォルダの権限に張替え
-    // await AuthorityFile.remove({ files: moved_dir._id })
-    // const docs = await AuthorityFile.find({ files: moved_dir.dir_id })
-    // for (let i in docs ) {
-    //   await AuthorityFile.create({
-    //     files: moved_dir._id,
-    //     role_files: docs[i].role_files,
-    //     users: docs[i].users,
-    //     group: docs[i].group,
-    //   })
-    // }
-
-    // // 移動したフォルダについて elasticsearch index更新
-    // const { tenant_id }= res.user;
-    // const updatedFile = await File.searchFileOne({_id: mongoose.Types.ObjectId(moving_id) });
-    // await esClient.createIndex(tenant_id,[updatedFile]);
-
     res.json({
       status: { success: true },
       body: movedDirs
@@ -547,12 +526,10 @@ export const move = async (req, res, next) => {
       }
     });
   }
-  //  });
 };
 
 export const moveDir = async (moving, destination, user, action) => {
   const _move = async (moving_id, destination_id, user, action) => {
-    //    return co(function* (){
     if (destination_id === undefined) throw "dir_id is invalid";
     await Dir.find({
       depth: { $gt: 0 },
@@ -606,10 +583,9 @@ export const moveDir = async (moving, destination, user, action) => {
 
     const moved_dir = await _moving.save();
     return moved_dir;
-    //   });
   };
-  //  return co(function* () {
   // 子のIDを取得する
+
   const childrenIds = (await Dir.find({ ancestor: moving, depth: { $gt: 0 } }).sort({ "depth": 1 })).map(dir => dir.descendant);
   // 子の現在位置を取得する
   const childrenDirs = await File.find({ _id: { $in: childrenIds } }).select({ _id: 1, dir_id: 1 });
@@ -624,7 +600,6 @@ export const moveDir = async (moving, destination, user, action) => {
   }
 
   return [moved_dir, ...moved_dirs];
-  //  });
 };
 
 export const getDescendants = (dir_id) => {
@@ -632,66 +607,46 @@ export const getDescendants = (dir_id) => {
 }
 
 
-export const view = (req, res, next) => {
-  co(function* () {
-    try {
-      // TODO: 詳細の取得処理はfiles.viewとほぼ同じなので共通化する.返却値に差があるので注意
-      let { dir_id } = req.params;
+export const view = async (req, res, next) => {
+  //  co(function* () {
+  try {
+    // TODO: 詳細の取得処理はfiles.viewとほぼ同じなので共通化する.返却値に差があるので注意
+    let { dir_id } = req.params;
 
-      // デフォルトはテナントのホーム
-      if (dir_id === undefined ||
-        dir_id === null ||
-        dir_id === "" ||
-        dir_id === "null") {
-        dir_id = res.user.tenant.home_dir_id;
-      }
-      if (!mongoose.Types.ObjectId.isValid(dir_id)) throw new ValidationError("ファイルIDが不正なためファイルの取得に失敗しました");
-
-      /*
-      const file_ids = yield getAllowedFileIds(
-        res.user._id, constants.PERMISSION_VIEW_DETAIL
-      );
-
-      if (!file_ids.map( f => f.toString() ).includes(dir_id.toString())) {
-        throw new PermisstionDeniedException("指定されたファイルが見つかりません");
-      }
-
-      const conditions = {
-        $and:[
-          {_id: mongoose.Types.ObjectId(dir_id)},
-          {_id: {$in : file_ids}}
-        ]
-      };
-
-      const file = yield File.searchFileOne(conditions);
-      */
-      const file_ids = yield isAllowedFileId(dir_id, res.user._id, constants.PERMISSION_VIEW_DETAIL)
-      if (!file_ids) throw new PermisstionDeniedException("指定されたファイルが見つかりません");
-
-      const file = yield File.searchFileOne({ _id: mongoose.Types.ObjectId(dir_id) });
-
-      if (file === null || file === "" || file === undefined) {
-        throw new RecordNotFoundException("指定されたファイルが見つかりません");
-      }
-
-      if (file.is_deleted) {
-        throw new RecordNotFoundException("ファイルは既に削除されているためファイルの取得に失敗しました");
-      }
-
-      const actions = extractFileActions(file.authorities, res.user);
-
-      res.json({
-        status: { success: true },
-        body: { ...file, actions }
-      });
-
+    // デフォルトはテナントのホーム
+    if (dir_id === undefined ||
+      dir_id === null ||
+      dir_id === "" ||
+      dir_id === "null") {
+      dir_id = res.user.tenant.home_dir_id;
     }
-    catch (e) {
-      logger.error(e);
+    if (!mongoose.Types.ObjectId.isValid(dir_id)) throw new ValidationError("ファイルIDが不正なためファイルの取得に失敗しました");
 
-      res.status(400).json({
-        status: { success: false, message: "ファイルの取得に失敗しました", errors: e }
-      });
+    const file_ids = await isAllowedFileId(dir_id, res.user._id, constants.PERMISSION_VIEW_DETAIL)
+    if (!file_ids) throw new PermisstionDeniedException("指定されたファイルが見つかりません");
+
+    const file = await File.searchFileOne({ _id: mongoose.Types.ObjectId(dir_id) });
+
+    if (file === null || file === "" || file === undefined) {
+      throw new RecordNotFoundException("指定されたファイルが見つかりません");
     }
-  });
+
+    if (file.is_deleted) {
+      throw new RecordNotFoundException("ファイルは既に削除されているためファイルの取得に失敗しました");
+    }
+
+    const actions = extractFileActions(file.authorities, res.user);
+
+    res.json({
+      status: { success: true },
+      body: { ...file, actions }
+    });
+  }
+  catch (e) {
+    logger.error(e);
+    res.status(400).json({
+      status: { success: false, message: "ファイルの取得に失敗しました", errors: e }
+    });
+  }
+  //  });
 };

@@ -114,7 +114,7 @@ describe('lib/controllers/dirs', () => {
     it(`成功  appSettings.inherit_parent_dir_auth === true`, async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       const req = {
-        body: { dir_id: initData.tenant.home_dir_id, dir_name: 'new_name' }
+        body: { dir_id: initData.tenant.home_dir_id, dir_name: testHelper.getUUID() }
       }
       const res_json = jest.fn()
       const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
@@ -134,7 +134,7 @@ describe('lib/controllers/dirs', () => {
     it(`成功  appSettings.inherit_parent_dir_auth === false`, async () => {
       await updateAppSetting_InheritParentDirAuth(false)
       const req = {
-        body: { dir_id: initData.tenant.home_dir_id, dir_name: 'new_name2' }
+        body: { dir_id: initData.tenant.home_dir_id, dir_name: testHelper.getUUID() }
       }
       const res_json = jest.fn()
       const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
@@ -151,7 +151,7 @@ describe('lib/controllers/dirs', () => {
       }
     })
   })
-  describe.only(`move()`, () => {
+  describe(`move()`, () => {
     it(`moving_id is empty`, async () => {
       let file_id 
       // フォルダ作成
@@ -191,6 +191,7 @@ describe('lib/controllers/dirs', () => {
       expect(res_body.status.message).toBe("フォルダの移動に失敗しました")
     })
     it(`成功 子フォルダへ移動`, async () => {
+      await updateAppSetting_InheritParentDirAuth(true)
       let file_id 
       let child_dir_id 
       let child_file_id 
@@ -248,6 +249,7 @@ describe('lib/controllers/dirs', () => {
       }
     })
     it(`成功 ゴミ箱から一般へ移動`, async () => {
+      await updateAppSetting_InheritParentDirAuth(true)
       let file_id 
       let child_dir_id 
       let child_file_id 
@@ -311,6 +313,64 @@ describe('lib/controllers/dirs', () => {
     })
   })
   describe(`view()`, () => {
+    it(`dir_id is invalid`, async () => {
+      let file_id 
+      // フォルダ作成
+      const result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'top_'+ testHelper.getUUID())
+      file_id = result.res.body._id
+      const req = {
+        params: { dir_id: 'xxxxxx' },
+      }
+      const res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      await controller.view(req, res)
+      expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
+      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      expect(res_body.status.success).toBe(false)
+      expect(res_body.status.message).toBe("ファイルの取得に失敗しました")
+    })
+    it(`成功 dir_id指定なしの場合は、TOPの情報を返す`, async () => {
+      let file_id 
+      // フォルダ作成
+      const dir_name = 'top_'+ testHelper.getUUID() 
+      const result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, dir_name )
+      file_id = result.res.body._id
+      const req = {
+        params: { dir_id: null },
+      }
+      const res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      await controller.view(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        expect(res_body.body.name).toBe('Top') //nameが一致する
+        expect(res_body.body._id.toString()).toBe(initData.tenant.home_dir_id.toString()) //dir_idが一致する
+      }
+    })
+    it(`成功 dir_id指定の情報を返す`, async () => {
+      let file_id 
+      // フォルダ作成
+      const dir_name = 'top_'+ testHelper.getUUID() 
+      const result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, dir_name )
+      file_id = result.res.body._id
+      const req = {
+        params: { dir_id: file_id },
+      }
+      const res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      await controller.view(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        expect(res_body.body.name).toBe(dir_name) //nameが一致する
+        expect(res_body.body._id.toString()).toBe(file_id.toString()) //dir_idが一致する
+      }
+    })
   })
   describe(`tree()`, () => {
   })
