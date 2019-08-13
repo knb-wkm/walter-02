@@ -1422,6 +1422,83 @@ describe('lib/controllers/files', () => {
     })
   })
   describe(`deleteFileLogical()`, () => {
+    it(`files is empty`, async () => {
+      const req = {
+        params: { file_id: null },
+      }
+      const res_json = jest.fn()
+      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: res_json })) }
+      await controller.deleteFileLogical(req, res)
+
+      expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
+      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      expect(res_body.status.success).toBe(false)
+      expect(res_body.status.message).toBe("ファイルの削除に失敗しました")
+      expect(res_body.status.errors.file_id).toBeTruthy() 
+    });
+    it(`成功 １ファイル`, async () => {
+      let file_id 
+      let result
+      // ファイルアップロード
+      result = await _upload_file([{ ...filesData.sample_file }], initData.tenant.trash_dir_id)
+      file_id = result.res.body[0]._id
+      const req = {
+        params: { file_id },
+      }
+      const res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      await controller.deleteFileLogical(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        const file = (await File.findOne({ _id: file_id }))
+        expect(file.is_deleted).toBeTruthy() //削除フラグが立つ
+        expect(file.is_trash).toBeTruthy() //
+      }
+    })
+    it(`成功 フォルダとファイル`, async () => {
+      let file_id 
+      let child_dir_id 
+      let child_file_id 
+      let grandchild_file_id 
+      await (async() => {
+        let result
+        // フォルダ作成
+        result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'trash_parent'+ testHelper.getUUID())
+        file_id = result.res.body._id
+        // フォルダへ権限追加
+        result = await _add_authority(file_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
+        // ファイルアップロード
+        result = await _upload_file([{ ...filesData.sample_file }], file_id)
+        child_file_id = result.res.body[0]._id
+        // フォルダ作成
+        result = await _create_dir({ ...initData.user }, file_id, testHelper.getUUID())
+        child_dir_id = result.res.body._id
+        // ファイルアップロード
+        result = await _upload_file([{ ...filesData.sample_file }], child_dir_id)
+        grandchild_file_id = result.res.body[0]._id
+      })()
+      const req = {
+        params: { file_id },
+      }
+      const res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      await controller.deleteFileLogical(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        const file_ids = [file_id, child_dir_id, child_file_id, grandchild_file_id]
+        for (var i = 0; i < file_ids.length; i++){
+          const file = (await File.findOne({ _id: file_ids[i] }))
+          expect(file.is_deleted).toBeTruthy() //削除フラグが立つ
+          expect(file.is_trash).toBeTruthy() //
+        }
+      }
+    })
   })
 });
 

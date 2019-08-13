@@ -2880,30 +2880,32 @@ export const deleteFileLogical = async (req,res,next) => {
     file.histories = file.histories.concat(history);
 
     let deletedFiles
-    // if (file.is_dir) {
-    //   const deletingDirs = await Dir.find({ ancestor: file._id });
-    //   const deletingDirIds = deletingDirs.map(dir => dir.descendant)
-    //   const deletingFiles = await File.find({
-    //     $or: [
-    //       { _id: { $in: deletingDirIds } },
-    //       { dir_id: { $in: deletingDirIds} }
-    //     ]
-    //   });
-    //   for (let i in deletingFiles) {
-    //     deletingFiles[i].is_deleted = true;
-    //     await deletingFiles[i].save();
-    //     // フォルダ内のファイルについて elasticsearch index更新
-    //     const updatedFile = await File.searchFileOne({ _id: deletingFiles[i]._id });
-    //     await esClient.syncDocument(tenant_id, updatedFile);
-    //   }
-    //   deletedFiles = deletingFiles
-    // } else {
+    if (file.is_dir) {
+      const deletingDirs = await Dir.find({ ancestor: file._id });
+      const deletingDirIds = deletingDirs.map(dir => dir.descendant)
+      const deletingFiles = await File.find({
+        $or: [
+          { _id: { $in: deletingDirIds } },
+          { dir_id: { $in: deletingDirIds} }
+        ]
+      });
+      for (let i in deletingFiles) {
+        deletingFiles[i].is_deleted = true;
+        deletingFiles[i].is_trash = true;
+        await deletingFiles[i].save();
+        // フォルダ内のファイルについて elasticsearch index更新
+        const updatedFile = await File.searchFileOne({ _id: deletingFiles[i]._id });
+        await esClient.syncDocument(tenant_id, updatedFile);
+      }
+      deletedFiles = deletingFiles
+    } else {
       file.is_deleted = true;
+      file.is_trash = true;
       await file.save();
       const updatedFile = await File.searchFileOne({ _id: file._id });
       await esClient.syncDocument(tenant_id, updatedFile);
       deletedFiles = [updatedFile]
-    // }
+    }
 
     res.json({
       status: { success: true },
@@ -2931,7 +2933,7 @@ export const deleteFileLogical = async (req,res,next) => {
     }
 
     res.status(400).json({
-      status: { success: false, errors }
+      status: { success: false, message: 'ファイルの削除に失敗しました', errors }
     });
 
   }
