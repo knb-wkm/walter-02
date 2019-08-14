@@ -65,7 +65,7 @@ export const verifyAuth = (auth1, auth2, user, full_controll_id) => {
 }
 
 export const stop_test = message => {
-  throw new Error('This test was force-stop: ' + message)
+  throw new Error('テスト強制終了: ' + message)
 }
 
 export const check_preprocess_success = param => {

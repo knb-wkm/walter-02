@@ -42,16 +42,17 @@ describe('lib/controllers/dirs', () => {
     const req = {
       body: { files: files_array, dir_id }
     }
-    const res_error_json = jest.fn()
-    const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_error_json })) }
+    const error_res_json = jest.fn()
+    const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
     await files_controller.upload(req, res)
     if (res.json.mock.calls.length === 0) {
-      return { success: false, errors: res_error_json.mock.calls[0][0].status.errors}
+      return { success: false, errors: error_res_json.mock.calls[0][0].status.errors}
     } else {
       return { success: true, res: res.json.mock.calls[0][0] }
     }
   }
 
+  // files.addAuthoritya()のラッパー
   const _add_authority = async (file_id, user, group, role) => {
     const req = {
       params: { file_id },
@@ -61,24 +62,25 @@ describe('lib/controllers/dirs', () => {
         role: role,
       }
     }
-    const res_error_json = jest.fn()
-    const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_error_json })) }
+    const error_res_json = jest.fn()
+    const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
     await files_controller.addAuthority(req, res)
     if (res.json.mock.calls.length === 0) {
-      return { success: false, errors: res_error_json.mock.calls[0][0].status.errors}
+      return { success: false, errors: error_res_json.mock.calls[0][0].status.errors}
     } else {
       return { success: true, res: res.json.mock.calls[0][0] }
     }
   }
+  // Dirs.create()のラッパー 
   const _create_dir = async (user, dir_id, dir_name) => {
     const req = {
       body: { dir_id, dir_name }
     }
-    const res_error_json = jest.fn()
-    const res = { user: { ...user }, json: jest.fn(), status: jest.fn(() => ({ json: res_error_json })) }
+    const error_res_json = jest.fn()
+    const res = { user: { ...user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
     await controller.create(req, res)
     if (res.json.mock.calls.length === 0) {
-      return { success: false, errors: res_error_json.mock.calls[0][0].status.errors}
+      return { success: false, errors: error_res_json.mock.calls[0][0].status.errors}
     } else {
       return { success: true, res: res.json.mock.calls[0][0] }
     }
@@ -87,40 +89,43 @@ describe('lib/controllers/dirs', () => {
   describe(`create()`, () => {
     beforeAll(async () => {
     })
-    it(`dir_id is empty`, async () => {
+
+    it(`パラメータ不正'dir_id is empty'の確認： body.dir_idが空の場合はBadRequestエラー`, async () => {
       const req = {
         body: { dir_id: null, dir_name: null }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.create(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("フォルダの作成に失敗しました")
     })
-    it(`dir_name is empty`, async () => {
+
+    it(`パラメータ不正'dir_id is empty'の確認： body.dir_nameが空の場合はBadRequestエラー`, async () => {
       const req = {
         body: { dir_id: initData.tenant.home_dir_id, dir_name: null }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.create(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("フォルダの作成に失敗しました")
     })
-    it(`成功  appSettings.inherit_parent_dir_auth === true`, async () => {
+
+    it(`フォルダ作成成功の確認(appSettings.inherit_parent_dir_auth === true): フォルダの情報が返り、その権限は親フォルダの権限を継承し、さらに操作ユーザーのフルコントロールが付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       const req = {
         body: { dir_id: initData.tenant.home_dir_id, dir_name: testHelper.getUUID() }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.create(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -131,16 +136,17 @@ describe('lib/controllers/dirs', () => {
         expect(testHelper.verifyAuth(dirAuthorityFiles, myAuthorityFiles, initData.user, initData.roleFileFull._id)).toBeTruthy()
       }
     })
-    it(`成功  appSettings.inherit_parent_dir_auth === false`, async () => {
+
+    it(`フォルダ作成成功の確認(appSettings.inherit_parent_dir_auth === false): フォルダの情報が返り、その権限は操作ユーザーのフルコントロールのみ付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(false)
       const req = {
         body: { dir_id: initData.tenant.home_dir_id, dir_name: testHelper.getUUID() }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.create(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -151,8 +157,10 @@ describe('lib/controllers/dirs', () => {
       }
     })
   })
+
   describe(`move()`, () => {
-    it(`moving_id is empty`, async () => {
+
+    it(`パラメータ不正'moving_id is empty'の確認： params.moving_idが空の場合はBadRequestエラー`, async () => {
       let file_id 
       // フォルダ作成
       const result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'top_'+ testHelper.getUUID())
@@ -163,15 +171,16 @@ describe('lib/controllers/dirs', () => {
           destinationDir: { _id: null },
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.move(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("フォルダの移動に失敗しました")
     })
-    it(`destination_id is empty`, async () => {
+
+    it(`パラメータ不正'destination_id is empty'の確認： body.destinationDir._idが空の場合はBadRequestエラー`, async () => {
       let file_id 
       // フォルダ作成
       const result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'top_'+ testHelper.getUUID())
@@ -182,15 +191,16 @@ describe('lib/controllers/dirs', () => {
           destinationDir: { _id: null },
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.move(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("フォルダの移動に失敗しました")
     })
-    it(`成功 子フォルダへ移動`, async () => {
+
+    it(`子孫ファイルを持つフォルダの別フォルダへ移動成功を確認(appSettings.inherit_parent_dir_auth === true): 操作後のフォルダの親フォルダが変更され、その権限は親フォルダの権限を継承し、さらに操作ユーザーのフルコントロールが付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       let file_id 
       let child_dir_id 
@@ -213,7 +223,7 @@ describe('lib/controllers/dirs', () => {
         // ファイルアップロード
         result = await _upload_file([{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
-        // サブフォルダ作成
+        // 移動先フォルダ作成
         result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'topsub_'+ testHelper.getUUID())
         sub_dir_id = result.res.body._id
       })()
@@ -223,13 +233,13 @@ describe('lib/controllers/dirs', () => {
           destinationDir: { _id: sub_dir_id.toString() },
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file_id_array = [file_id, child_dir_id, child_file_id, grandchild_file_id]      
       const myAuthorityFiles_org_list = await Promise.all(file_id_array.map(async id => await AuthorityFile.find({ files: id })))
       await controller.move(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -248,7 +258,8 @@ describe('lib/controllers/dirs', () => {
         })
       }
     })
-    it(`成功 ゴミ箱から一般へ移動`, async () => {
+
+    it(`子孫ファイルを持つフォルダをゴミ箱からTOPへ移動成功を確認(appSettings.inherit_parent_dir_auth === true): 操作後のフォルダの親フォルダが変更され、その権限は親フォルダの権限を継承し、さらに操作ユーザーのフルコントロールが付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       let file_id 
       let child_dir_id 
@@ -273,8 +284,8 @@ describe('lib/controllers/dirs', () => {
         const req = {
           params: { file_id },
         }
-        const res_json = jest.fn()
-        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
         await files_controller.moveTrash(req, res)
       })()
       const req = {
@@ -283,13 +294,13 @@ describe('lib/controllers/dirs', () => {
           destinationDir: { _id: initData.tenant.home_dir_id.toString() },
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file_id_array = [file_id, child_dir_id, child_file_id, grandchild_file_id]      
       const myAuthorityFiles_org_list = await Promise.all(file_id_array.map(async id => await AuthorityFile.find({ files: id })))
       await controller.move(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -312,8 +323,10 @@ describe('lib/controllers/dirs', () => {
       }
     })
   })
+
   describe(`view()`, () => {
-    it(`dir_id is invalid`, async () => {
+
+    it(`パラメータ不正'dir_id is invalid'の確認： params.dir_idが不正の場合はBadRequestエラー`, async () => {
       let file_id 
       // フォルダ作成
       const result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'top_'+ testHelper.getUUID())
@@ -321,15 +334,16 @@ describe('lib/controllers/dirs', () => {
       const req = {
         params: { dir_id: 'xxxxxx' },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.view(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルの取得に失敗しました")
     })
-    it(`成功 dir_id指定なしの場合は、TOPの情報を返す`, async () => {
+
+    it(`dir_id指定なしにて取得に成功: params.dir_idなしの場合は、TOPの情報を返す`, async () => {
       let file_id 
       // フォルダ作成
       const dir_name = 'top_'+ testHelper.getUUID() 
@@ -338,11 +352,11 @@ describe('lib/controllers/dirs', () => {
       const req = {
         params: { dir_id: null },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.view(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -350,7 +364,8 @@ describe('lib/controllers/dirs', () => {
         expect(res_body.body._id.toString()).toBe(initData.tenant.home_dir_id.toString()) //dir_idが一致する
       }
     })
-    it(`成功 dir_id指定の情報を返す`, async () => {
+
+    it(`dir_idを指定して取得に成功: 指定のフォルダの情報を返す`, async () => {
       let file_id 
       // フォルダ作成
       const dir_name = 'top_'+ testHelper.getUUID() 
@@ -359,11 +374,11 @@ describe('lib/controllers/dirs', () => {
       const req = {
         params: { dir_id: file_id },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.view(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
