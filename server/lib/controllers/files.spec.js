@@ -41,6 +41,7 @@ describe('lib/controllers/files', () => {
     await memMongo.disconnect()
   })
 
+  // files.upload()のラッパー
   const _upload_file = async (files_array, dir_id) => {
     const req = {
       body: { files: files_array, dir_id }
@@ -55,6 +56,7 @@ describe('lib/controllers/files', () => {
     }
   }
 
+  // files.addAuthority()のラッパー
   const _add_authority = async (file_id, user, group, role) => {
     const req = {
       params: { file_id },
@@ -73,6 +75,7 @@ describe('lib/controllers/files', () => {
       return { success: true, res: res.json.mock.calls[0][0] }
     }
   }
+  // dirs.create()のラッパー
   const _create_dir = async (user, dir_id, dir_name) => {
     const req = {
       body: { dir_id, dir_name }
@@ -86,6 +89,7 @@ describe('lib/controllers/files', () => {
       return { success: true, res: res.json.mock.calls[0][0] }
     }
   }
+  // metainfos.add()のラッパー
   const _add_metainfo = async (value_type) => {
     const req = {
       body: {
@@ -94,32 +98,33 @@ describe('lib/controllers/files', () => {
         }
       }
     }
-    const res_json = jest.fn()
-    const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+    const error_res_json = jest.fn()
+    const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
     await metainfo_controller.add(req, res)
     const res_body = res.json.mock.calls[0][0] //1回目の第一引数
     return res_body.body
   }
   describe(`upload()`, () => {
-    it(`テナント情報の取得`, async () => {
+    it(`テナント情報の取得: テストdb接続からテナント情報が正しく取得できる)`, async () => {
       expect(tenant_name).toBe(initData.tenant.name)
     })
 
-    it(`files is empty`, async () => {
+    it(`パラメータ不正'files is empty'の確認： body.filesが空の場合はBadRequestエラー`, async () => {
       const req = {
         body: { files: [] }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: error_res_json })) }
       await controller.upload(req, res)
 
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルのアップロードに失敗しました")
       expect(res_body.status.errors.files).toBeTruthy() //権限が正しい
     });
-    it(`1ファイル成功 appSettings.inherit_parent_dir_auth === true`, async () => {
+
+    it(`1ファイルupload成功の確認(appSettings.inherit_parent_dir_auth === true): 1ファイルの情報が返り、その権限は親フォルダの権限を継承し、さらに操作ユーザーのフルコントロールが付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       const result = await _upload_file([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
@@ -134,7 +139,8 @@ describe('lib/controllers/files', () => {
       }
       
     });
-    it(`3ファイル成功 appSettings.inherit_parent_dir_auth === true`, async () => {
+
+    it(`3ファイルupload成功の確認(appSettings.inherit_parent_dir_auth === true): 3ファイルの情報が返り、その権限は親フォルダの権限を継承し、さらに操作ユーザーのフルコントロールが付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       const result = await _upload_file([{ ...filesData.sample_file }, { ...filesData.sample_file }, { ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
@@ -149,7 +155,8 @@ describe('lib/controllers/files', () => {
         expect(result.errors).toBe('* 想定外なエラー')
       }
     });
-    it(`1ファイル成功 appSettings.inherit_parent_dir_auth === false`, async () => {
+
+    it(`1ファイルupload成功の確認(appSettings.inherit_parent_dir_auth === false): 1ファイルの情報が返り、その権限は操作ユーザーのフルコントロールのみ付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(false)
       const result = await _upload_file([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
@@ -161,7 +168,8 @@ describe('lib/controllers/files', () => {
         expect(result.errors).toBe('* 想定外なエラー')
       }
     });
-    it(`3ファイル成功 appSettings.inherit_parent_dir_auth === false`, async () => {
+
+    it(`3ファイルupload成功の確認(appSettings.inherit_parent_dir_auth === false): 3ファイルの情報が返り、その権限は操作ユーザーのフルコントロールのみ付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(false)
       const result = await _upload_file([{ ...filesData.sample_file }, { ...filesData.sample_file }, { ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
@@ -189,29 +197,31 @@ describe('lib/controllers/files', () => {
         console.log(result.errors)
       }
     })
-    it(`file_idが空です`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'file_idが空です'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id: null}
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.view(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルの取得に失敗しました")
     })
-    it(`成功`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`ファイル情報の取得成功を確認: responseのfile_idとrequestのfile_idが一致する`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.view(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -232,45 +242,48 @@ describe('lib/controllers/files', () => {
         console.log(result.errors)
       }
     })
-    it(`file_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id: null }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.rename(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイル名の変更に失敗しました")
     })
-    it(`name is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'name is empty'の確認: body.nameが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: {name: ''}
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.rename(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイル名の変更に失敗しました")
     })
-    it(`成功`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
-      const new_name = 'new_name'
+
+    it(`ファイル名変更成功の確認: responseのnameとrequestのnameが一致する`, async () => {
+      testHelper.check_preprocess_success(file_id)
+      const new_name = testHelper.getUUID() 
       const req = {
         params: { file_id },
         body: { name: new_name }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.rename(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -278,6 +291,7 @@ describe('lib/controllers/files', () => {
       }
     })
   })
+
   describe(`addAuthority()`, () => {
     let file_id = null
     beforeAll(async () => {
@@ -290,21 +304,22 @@ describe('lib/controllers/files', () => {
         console.log(result.errors)
       }
     })
-    it(`file_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id: null }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.addAuthority(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルへの権限の追加に失敗しました")
     })
-    it(`成功 ユーザーの読み取り権限追加`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+    it(`単一ファイルへのユーザー読取権限追加の成功を確認: 変更前と変更後のファイル権限の差分が、ユーザー読取権限と一致する`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: {
@@ -313,12 +328,12 @@ describe('lib/controllers/files', () => {
           role: { ...initData.roleFileReadonly },
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.addAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -330,8 +345,9 @@ describe('lib/controllers/files', () => {
         expect(diff[0].role_files.toString()).toBe(initData.roleFileReadonly._id.toString()) //差分権限のrolefile_idが一致
       }
     })
-    it(`同一権限追加はエラー ユーザーの読み取り権限追加`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`同一権限(ユーザー読取権限)追加は失敗する: BadRequestエラーが発生し、ファイルの権限は変更されない（変更前後のファイル権限が一致）`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: {
@@ -340,20 +356,21 @@ describe('lib/controllers/files', () => {
           role: { ...initData.roleFileReadonly },
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.addAuthority(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルへの権限の追加に失敗しました")
       const myAuthorityFiles_upd = (await AuthorityFile.find({ files: file_id }))
       const diff = testHelper.authDiff(myAuthorityFiles_org, myAuthorityFiles_upd)
       expect(diff.length).toBe(0) //変更前後で不一致なし
     })
-    it(`成功 グループの読み取り権限追加`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`単一ファイルへのグループ読取権限追加の成功を確認: 変更前と変更後のファイル権限の差分が、グループ読取権限と一致する`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: {
@@ -362,12 +379,12 @@ describe('lib/controllers/files', () => {
           role: { ...initData.roleFileReadonly },
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.addAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -379,8 +396,9 @@ describe('lib/controllers/files', () => {
         expect(diff[0].role_files.toString()).toBe(initData.roleFileReadonly._id.toString()) //差分権限のrolefile_idが一致
       }
     })
-    it(`同一権限追加はエラー グループの読み取り権限追加`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`同一権限(グループ読取権限)追加は失敗する: BadRequestエラーが発生し、ファイルの権限は変更されない（変更前後のファイル権限が一致）`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: {
@@ -389,19 +407,20 @@ describe('lib/controllers/files', () => {
           role: { ...initData.roleFileReadonly },
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.addAuthority(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルへの権限の追加に失敗しました")
       const myAuthorityFiles_upd = (await AuthorityFile.find({ files: file_id }))
       const diff = testHelper.authDiff(myAuthorityFiles_org, myAuthorityFiles_upd)
       expect(diff.length).toBe(0) //変更前後で不一致なし
     })
-    it(`成功 親フォルダへの読み取り権限追加(user)`, async () => {
+
+    it(`子孫ファイルを持つフォルダへユーザー読取権限追加の成功を確認: 対象フォルダ以下全てのフォルダ・ファイルへユーザー読み取り権限が追加される`, async () => {
       let parent_dir_id 
       let child_dir_id
       let child_file_id
@@ -429,13 +448,13 @@ describe('lib/controllers/files', () => {
           role: { ...initData.roleFileReadonly },
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file_id_array = [parent_dir_id,child_dir_id,child_file_id,grandchild_file_id]      
       const myAuthorityFiles_org_list = await Promise.all(file_id_array.map(async id => await AuthorityFile.find({ files: id })))
       await controller.addAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -453,7 +472,7 @@ describe('lib/controllers/files', () => {
         })
       }
     })
-    it(`成功 親フォルダへの読み取り権限追加(group)`, async () => {
+    it(`子孫ファイルを持つフォルダへグループ読取権限追加の成功を確認: 対象フォルダ以下全てのフォルダ・ファイルへグループ読み取り権限が追加される`, async () => {
       let parent_dir_id 
       let child_dir_id
       let child_file_id
@@ -481,13 +500,13 @@ describe('lib/controllers/files', () => {
           role: { ...initData.roleFileReadonly },
          }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file_id_array = [parent_dir_id,child_dir_id,child_file_id,grandchild_file_id]      
       const myAuthorityFiles_org_list = await Promise.all(file_id_array.map(async id => await AuthorityFile.find({ files: id })))
       await controller.addAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -506,6 +525,7 @@ describe('lib/controllers/files', () => {
       }
     })
   })
+
   describe(`removeAuthority()`, () => {
     let file_id = null
     beforeAll(async () => {
@@ -519,30 +539,32 @@ describe('lib/controllers/files', () => {
           const result3 = await _add_authority(file_id, null, {...initData.groupMgr}, { ...initData.roleFileReadonly })
           if (result3.success) {
           } else {
-            console.log(result3.errors)
+            testHelper.stop_test(result3.errors)
           }
         } else {
-          console.log(result2.errors)
+          testHelper.stop_test(result2.errors)
         }
       } else {
-        console.log(result.errors)
+        testHelper.stop_test(result.errors)
       }
     })
-    it(`file_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id: null }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.removeAuthority(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルへの権限の削除に失敗しました")
     })
-    it(`成功 ユーザーの読み取り権限削除(user)`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`単一ファイルのユーザー読取権限削除の成功を確認: 変更前と変更後のファイル権限の差分が、ユーザー読取権限と一致する`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         query: {
@@ -551,12 +573,12 @@ describe('lib/controllers/files', () => {
           role_id: initData.roleFileReadonly._id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.removeAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -568,8 +590,9 @@ describe('lib/controllers/files', () => {
         expect(diff[0].role_files.toString()).toBe(initData.roleFileReadonly._id.toString()) //差分権限のrolefile_idが一致
       }
     })
-    it(`role is empty (user)`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`存在しない権限(ユーザー読取権限)削除は失敗する: BadRequestエラーが発生し、ファイルの権限は変更されない（変更前後のファイル権限が一致）`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         query: {
@@ -578,12 +601,12 @@ describe('lib/controllers/files', () => {
           role_id: initData.roleFileReadonly._id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.removeAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -592,8 +615,9 @@ describe('lib/controllers/files', () => {
         expect(diff.length).toBe(0) //変更前後で不一致なし
       }
     })
-    it(`成功 ユーザーの読み取り権限削除(group)`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`単一ファイルのグループ読取権限削除の成功を確認: 変更前と変更後のファイル権限の差分が、グループ読取権限と一致する`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         query: {
@@ -602,12 +626,12 @@ describe('lib/controllers/files', () => {
           role_id: initData.roleFileReadonly._id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.removeAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -619,8 +643,9 @@ describe('lib/controllers/files', () => {
         expect(diff[0].role_files.toString()).toBe(initData.roleFileReadonly._id.toString()) //差分権限のrolefile_idが一致
       }
     })
-    it(`role is empty (group)`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`存在しない権限(グループ読取権限)削除は失敗する: BadRequestエラーが発生し、ファイルの権限は変更されない（変更前後のファイル権限が一致）`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         query: {
@@ -629,12 +654,12 @@ describe('lib/controllers/files', () => {
           role_id: initData.roleFileReadonly._id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.removeAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -643,7 +668,8 @@ describe('lib/controllers/files', () => {
         expect(diff.length).toBe(0) //変更前後で不一致なし
       }
     })
-    it(`成功 親フォルダの読み取り権限削除(user)`, async () => {
+
+    it(`子孫ファイルを持つフォルダのユーザー読取権限削除の成功を確認: 変更前と変更後の各ファイル権限の差分が、ユーザー読取権限と一致する`, async () => {
       let parent_dir_id 
       let child_dir_id
       let child_file_id
@@ -672,13 +698,13 @@ describe('lib/controllers/files', () => {
           role_id: initData.roleFileReadonly._id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file_id_array = [parent_dir_id,child_dir_id,child_file_id,grandchild_file_id]      
       const myAuthorityFiles_org_list = await Promise.all(file_id_array.map(async id => await AuthorityFile.find({ files: id })))
       await controller.removeAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -696,7 +722,8 @@ describe('lib/controllers/files', () => {
         })
       }
     })
-    it(`成功 親フォルダの読み取り権限削除(group)`, async () => {
+
+    it(`子孫ファイルを持つフォルダのグループ読取権限削除の成功を確認: 変更前と変更後の各ファイル権限の差分が、グループ読取権限と一致する`, async () => {
       let parent_dir_id 
       let child_dir_id
       let child_file_id
@@ -725,13 +752,13 @@ describe('lib/controllers/files', () => {
           role_id: initData.roleFileReadonly._id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file_id_array = [parent_dir_id,child_dir_id,child_file_id,grandchild_file_id]      
       const myAuthorityFiles_org_list = await Promise.all(file_id_array.map(async id => await AuthorityFile.find({ files: id })))
       await controller.removeAuthority(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -750,6 +777,7 @@ describe('lib/controllers/files', () => {
       }
     })
   })
+
   describe(`addTag()`, () => {
     let file_id = null
     let tag_id = null
@@ -764,52 +792,56 @@ describe('lib/controllers/files', () => {
         console.log(result.errors)
       }
     })
-    it(`file_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id: null }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.addTag(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("タグの追加に失敗しました")
     })
-    it(`tag_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'tag_id is empty'の確認: body._idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: {_id: ''}
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.addTag(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("タグの追加に失敗しました")
     })
-    it(`成功`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`タグの追加の成功を確認: 操作後のFiles.tags[0]._idがrequestのbody._idと一致する`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: {_id: tag_id}
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.addTag(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
         const file = (await File.findOne({ _id: file_id }))
-        expect(file.tags[0]._id.toString()).toBe(tag_id.toString())
+        expect(file.tags[0]._id.toString()).toBe(req.body._id.toString())
       }
     })
   })
+
   describe(`removeTag()`, () => {
     let file_id = null
     let tag_id = null
@@ -824,50 +856,53 @@ describe('lib/controllers/files', () => {
           params: { file_id },
           body: {_id: tag_id}
         }
-        const res_json = jest.fn()
-        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
         await controller.addTag(req, res)
       } else {
         console.log(result.errors)
       }
     })
-    it(`file_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id: null }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.removeTag(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("タグの削除に失敗しました")
     })
-    it(`tag_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'tag_id is empty'の確認: body._idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: {_id: ''}
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.removeTag(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("タグの削除に失敗しました")
     })
-    it(`成功`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`タグの削除の成功を確認: 操作後のFiles.tagsが１つ減る`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id, tag_id },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.removeTag(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -876,6 +911,7 @@ describe('lib/controllers/files', () => {
       }
     })
   })
+
   describe(`addMeta()`, () => {
     let file_id = null
     let meta = null
@@ -887,62 +923,66 @@ describe('lib/controllers/files', () => {
         file_id = result.res.body[0]._id
         meta = await _add_metainfo('String')
       } else {
-        console.log(result.errors)
+        testHelper.stop_test(result.errors)
       }
     })
-    it(`file_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id: null },
         body: { meta: { _id: null }, value: '' }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.addMeta(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("メタ情報の追加に失敗しました")
     })
-    it(`meta_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'meta_id is empty'の確認: body.meta._idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: { meta: { _id: null }, value: '' }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.addMeta(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("メタ情報の追加に失敗しました")
     })
-    it(`metainfo value is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'metainfo value is empty'の確認: body.valueが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
         body: { meta: { _id: meta.id }, value: '' }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.addMeta(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("メタ情報の追加に失敗しました")
     })
-    it(`成功`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`メタ情報の追加の成功を確認: 操作後のFileMetaInfosの情報とリクエストのmetainfoのid/valueが一致する`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
-        body: { meta: { _id: meta.id }, value: 'qqqqq' }
+        body: { meta: { _id: meta.id }, value: testHelper.getUUID()}
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.addMeta(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -952,6 +992,7 @@ describe('lib/controllers/files', () => {
       }
     })
   })
+
   describe(`removeMeta()`, () => {
     let file_id = null
     let meta = null
@@ -966,49 +1007,52 @@ describe('lib/controllers/files', () => {
           params: { file_id },
           body: { meta: { _id: meta.id }, value: 'qqqqq' }
         }
-        const res_json = jest.fn()
-        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
         await controller.addMeta(req, res)
       } else {
         console.log(result.errors)
       }
     })
-    it(`file_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id: null },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.removeMeta(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("メタ情報の削除に失敗しました")
     })
-    it(`meta_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'meta_id is empty'の確認: params.meta_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id, meta_id:null },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.removeMeta(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("メタ情報の削除に失敗しました")
     })
-    it(`成功`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`メタ情報の削除の成功を確認: 操作後のFileMetaInfosの情報が削除される`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id, meta_id: meta.id },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.removeMeta(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -1017,6 +1061,7 @@ describe('lib/controllers/files', () => {
       }
     })
   })
+
   describe(`toggleStar()`, () => {
     let file_id = null
     beforeAll(async () => {
@@ -1029,70 +1074,78 @@ describe('lib/controllers/files', () => {
         console.log(result.errors)
       }
     })
-    it(`file_id is empty`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id: null }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.toggleStar(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルのお気に入りの設定に失敗しました")
     })
-    it(`成功`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`スター付与の成功を確認: 操作後のFiles.is_starが反転しtrueになる`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file = (await File.findOne({ _id: file_id }))
       const is_star_org = file.is_star
       await controller.toggleStar(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
-        expect(res_body.body.is_star).toBe(!is_star_org) // is_starが反転する
+        expect(is_star_org).toBeFalsy() 
+        expect(res_body.body.is_star).toBeTruthy() // is_starが反転する
       }
     })
-    it(`成功(再反転)`, async () => {
-      if (!file_id) { expect('').toBe('前処理に失敗'); return }
+
+    it(`スター剥奪の成功を確認: 操作後のFiles.is_starが反転しfalseになる`, async () => {
+      testHelper.check_preprocess_success(file_id)
       const req = {
         params: { file_id },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file = (await File.findOne({ _id: file_id }))
       const is_star_org = file.is_star
       await controller.toggleStar(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
-        expect(res_body.body.is_star).toBe(!is_star_org) // is_starが反転する
+        expect(is_star_org).toBeTruthy() 
+        expect(res_body.body.is_star).toBeFalsy() // is_starが反転する
       }
     })
   })
+
   describe(`moveTrash()`, () => {
-    it(`file_id is empty`, async () => {
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
       const req = {
         params: { file_id: null }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.moveTrash(req, res)
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ゴミ箱への移動に失敗しました")
     })
-    it(`成功 file`, async () => {
+
+    it(`単一ファイル削除（ゴミ箱へ移動）の成功を確認: 操作後のFile.dir_idがtenant.trash_dir_idになる。ファイル権限は変更されない。`, async () => {
       let file_id = null
       let is_trash_org
       await (async() => {
@@ -1107,26 +1160,26 @@ describe('lib/controllers/files', () => {
       const req = {
         params: { file_id },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.moveTrash(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
         const file_upd = (await File.findOne({ _id: file_id }))
         expect(file_upd.dir_id.toString()).toBe(initData.tenant.trash_dir_id.toString()) //所属フォルダが変更されている
-        expect(is_trash_org).toBeFalsy() // 移動前はis_trash===false
+        expect(is_trash_org).toBeFalsy() 
         expect(file_upd.is_trash).toBeTruthy() // 移動後はis_trash===true
-        expect(file_upd.dir_id.toString()).toBe(initData.tenant.trash_dir_id.toString()) //所属フォルダが変更されている
         const myAuthorityFiles_upd = (await AuthorityFile.find({ files: file_id }))
         const diff = testHelper.authDiff(myAuthorityFiles_org, myAuthorityFiles_upd)
         expect(diff.length).toBe(0) //変更前後で不一致はなし
       }
     })
-    it(`成功 dirs`, async () => {
+
+    it(`子孫ファイルを持つフォルダ削除（ゴミ箱へ移動）の成功を確認: 操作後のFile.dir_idがtenant.trash_dir_idになる。ファイル権限は変更されない。`, async () => {
       let file_id 
       let child_dir_id 
       let child_file_id 
@@ -1151,13 +1204,13 @@ describe('lib/controllers/files', () => {
       const req = {
         params: { file_id },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file_id_array = [file_id, child_dir_id, child_file_id, grandchild_file_id]      
       const myAuthorityFiles_org_list = await Promise.all(file_id_array.map(async id => await AuthorityFile.find({ files: id })))
       await controller.moveTrash(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -1181,24 +1234,26 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
     })
-    it(`files is empty`, async () => {
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
       const req = {
         params: { file_id: null },
         body: {
           dir_id: initData.tenant.home_dir_id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: error_res_json })) }
       await controller.move(req, res)
 
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルの移動に失敗しました")
       expect(res_body.status.errors.file_id).toBeTruthy() 
     });
-    it(`dir_id is empty`, async () => {
+
+    it(`パラメータ不正'dir_id is empty'の確認: params.body.dir_idが空の場合はBadRequestエラー`, async () => {
       const result = await _upload_file([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       const file_id = result.res.body[0]._id
       const req = {
@@ -1207,27 +1262,28 @@ describe('lib/controllers/files', () => {
           dir_id: null,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: error_res_json })) }
       await controller.move(req, res)
 
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルの移動に失敗しました")
       expect(res_body.status.errors.dir_id).toBeTruthy() //権限が正しい
     });
-    it(`成功 子フォルダへ移動 権限の増加(user)`, async () => {
+
+    it(`ファイルの子フォルダへ移動が成功するのを確認: ユーザー権限の追加されたフォルダへ移動し、権限が増加するのを確認する`, async () => {
       let child_dir_id 
       await (async() => {
         let result
-        // TOP直下へ親フォルダ作成
-        result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'parent'+ testHelper.getUUID())
-        child_dir_id = result.res.body._id
-        // 親フォルダへファイルアップロード
+        // TOPフォルダへファイルアップロード
         result = await _upload_file([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
         file_id = result.res.body[0]._id
-        // 親フォルダへ権限追加
+        // TOP直下へフォルダ作成
+        result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'parent'+ testHelper.getUUID())
+        child_dir_id = result.res.body._id
+        // フォルダへ権限追加
         result = await _add_authority(child_dir_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
       })()
       const req = {
@@ -1236,12 +1292,12 @@ describe('lib/controllers/files', () => {
           dir_id: child_dir_id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.move(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -1255,18 +1311,19 @@ describe('lib/controllers/files', () => {
         expect(diff[0].role_files.toString()).toBe(initData.roleFileReadonly._id.toString()) //差分権限のrolefile_idが一致
       }
     })
-    it(`成功 子フォルダへ移動 権限の増加(group)`, async () => {
+
+    it(`ファイルの子フォルダへ移動が成功するのを確認: グループ権限の追加されたフォルダへ移動し、権限が増加するのを確認する`, async () => {
       let child_dir_id 
       await (async() => {
         let result
-        // TOP直下へ親フォルダ作成
+        // TOP直下へフォルダ作成
         result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'parent'+ testHelper.getUUID())
         child_dir_id = result.res.body._id
-        // 親フォルダへファイルアップロード
+        // フォルダへ権限追加
+        result = await _add_authority(child_dir_id, null, { ...initData.groupMgr }, { ...initData.roleFileReadonly })
+        // TOPフォルダへファイルアップロード
         result = await _upload_file([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
         file_id = result.res.body[0]._id
-        // 親フォルダへ権限追加
-        result = await _add_authority(child_dir_id, null, { ...initData.groupMgr }, { ...initData.roleFileReadonly })
       })()
       const req = {
         params: { file_id },
@@ -1274,12 +1331,12 @@ describe('lib/controllers/files', () => {
           dir_id: child_dir_id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.move(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -1293,14 +1350,15 @@ describe('lib/controllers/files', () => {
         expect(diff[0].role_files.toString()).toBe(initData.roleFileReadonly._id.toString()) //差分権限のrolefile_idが一致
       }
     })
-    it(`成功 親フォルダへ移動 権限の減少(user)`, async () => {
+
+    it(`ファイルの親フォルダへ移動が成功するのを確認: ユーザー権限が減らされたフォルダへ移動し、権限が減少するのを確認する`, async () => {
       let child_dir_id 
       await (async() => {
         let result
-        // TOP直下へ親フォルダ作成
+        // TOP直下へフォルダ作成
         result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'parent'+ testHelper.getUUID())
         child_dir_id = result.res.body._id
-        // 親フォルダへ権限追加
+        // フォルダへ権限追加
         result = await _add_authority(child_dir_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
         // 親フォルダへファイルアップロード
         result = await _upload_file([{ ...filesData.sample_file }], child_dir_id)
@@ -1312,12 +1370,12 @@ describe('lib/controllers/files', () => {
           dir_id: initData.tenant.home_dir_id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.move(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -1331,7 +1389,8 @@ describe('lib/controllers/files', () => {
         expect(diff[0].role_files.toString()).toBe(initData.roleFileReadonly._id.toString()) //差分権限のrolefile_idが一致
       }
     })
-    it(`成功 親フォルダへ移動 権限の減少(group)`, async () => {
+
+    it(`ファイルの親フォルダへ移動が成功するのを確認: グループ権限が減らされたフォルダへ移動し、権限が減少するのを確認する`, async () => {
       let child_dir_id
       await (async () => {
         let result
@@ -1350,12 +1409,12 @@ describe('lib/controllers/files', () => {
           dir_id: initData.tenant.home_dir_id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const myAuthorityFiles_org = (await AuthorityFile.find({ files: file_id }))
       await controller.move(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -1369,7 +1428,8 @@ describe('lib/controllers/files', () => {
         expect(diff[0].role_files.toString()).toBe(initData.roleFileReadonly._id.toString()) //差分権限のrolefile_idが一致
       }
     })
-    it(`成功 ゴミ箱から一般へ移動: 権限はis_defaultを除いて親フォルダ権限へ洗い替え`, async () => {
+
+    it(`ゴミ箱からTOPへファイル移動が成功するのを確認: 権限はis_defaultを除いて親フォルダ権限へ洗い替えされる。`, async () => {
       let file_id 
       await (async() => {
         let result
@@ -1381,8 +1441,8 @@ describe('lib/controllers/files', () => {
         const req = {
           params: { file_id },
         }
-        const res_json = jest.fn()
-        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
         await controller.moveTrash(req, res)
       })()
       const req = {
@@ -1391,12 +1451,12 @@ describe('lib/controllers/files', () => {
           dir_id: initData.tenant.home_dir_id,
         }
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       const file_id_array = [file_id]      
       await controller.move(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -1421,22 +1481,25 @@ describe('lib/controllers/files', () => {
     it(`成功 ゴミ箱からゴミ箱へ移動: 許可しない`, async () => {
     })
   })
+  
   describe(`deleteFileLogical()`, () => {
-    it(`files is empty`, async () => {
+
+    it(`パラメータ不正'file_id is empty'の確認: params.file_idが空の場合はBadRequestエラー`, async () => {
       const req = {
         params: { file_id: null },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: error_res_json })) }
       await controller.deleteFileLogical(req, res)
 
       expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
-      const res_body = res_json.mock.calls[0][0] //1回目の第一引数
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
       expect(res_body.status.success).toBe(false)
       expect(res_body.status.message).toBe("ファイルの削除に失敗しました")
       expect(res_body.status.errors.file_id).toBeTruthy() 
     });
-    it(`成功 １ファイル`, async () => {
+
+    it(`１ファイルの論理削除成功を確認: Files.is_deletedがtrueになる`, async () => {
       let file_id 
       let result
       // ファイルアップロード
@@ -1445,11 +1508,11 @@ describe('lib/controllers/files', () => {
       const req = {
         params: { file_id },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.deleteFileLogical(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
@@ -1458,7 +1521,8 @@ describe('lib/controllers/files', () => {
         expect(file.is_trash).toBeTruthy() //
       }
     })
-    it(`成功 フォルダとファイル`, async () => {
+
+    it(`子孫ファイルを持つフォルダの論理削除成功を確認: 各Files.is_deletedがtrueになる`, async () => {
       let file_id 
       let child_dir_id 
       let child_file_id 
@@ -1483,11 +1547,11 @@ describe('lib/controllers/files', () => {
       const req = {
         params: { file_id },
       }
-      const res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: res_json })) }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
       await controller.deleteFileLogical(req, res)
       if (res.json.mock.calls.length === 0) {
-        expect(res_json.mock.calls[0][0].status.errors).toBe('failed')
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
