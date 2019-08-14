@@ -63,3 +63,11 @@ export const verifyAuth = (auth1, auth2, user, full_controll_id) => {
   if (user && compare(diff[0].users, user._id) && compare(diff[0].role_files, full_controll_id) && diff[0].is_default) return true
   return false
 }
+
+export const stop_test = message => {
+  throw new Error('This test was force-stop: ' + message)
+}
+
+export const check_preprocess_success = param => {
+  if(!param) stop_test('テストの前処理に失敗したため続行できません')
+}
