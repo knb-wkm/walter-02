@@ -8,6 +8,7 @@ import User from "../models/User";
 import Tenant from "../models/Tenant";
 import AppSetting from "../models/AppSetting";
 import RoleFile from "../models/RoleFile";
+import RoleMenu from "../models/RoleMenu";
 import Group from "../models/Group";
 
 
@@ -39,6 +40,8 @@ export const connect = async (tenant_name) => {
   initData.group = (await Group.find({ tenant_id: initData.tenant._id }))
   initData.groupMgr = initData.group.filter(role => role.name === '管理者')[0].toObject()
   initData.groupNorm = initData.group.filter(role => role.name === '全社')[0].toObject()
+  initData.roleMenu = (await RoleMenu.find({ tenant_id: initData.tenant._id }))
+  initData.roleMenuMgr = initData.roleMenu.filter(role => role.name === 'システム管理者')[0].toObject()
   return initData
 }
 
