@@ -1564,5 +1564,288 @@ describe('lib/controllers/files', () => {
       }
     })
   })
+
+  describe(`search()`, () => {
+    let child_dir_id
+    let child2_dir_id
+    let grandchild_dir_id
+    beforeAll(async () => {
+      let result
+      await updateAppSetting_InheritParentDirAuth(true)
+      // フォルダ作成
+      result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'bcd_dir')
+      child_dir_id = result.res.body._id
+      // フォルダ作成
+      result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'bcd_dir_2')
+      grandchild_dir_id = result.res.body._id
+      // フォルダ作成
+      result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'bcd_dir_3')
+      child2_dir_id = result.res.body._id
+      const file_names = [
+        {
+          name: 'bcd.txt', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: 'bcd.txt', dir_id: child_dir_id
+        },
+        {
+          name: 'bcd.txt', dir_id: child2_dir_id
+        },
+        {
+          name: 'bcd.txt', dir_id: grandchild_dir_id
+        },
+        {
+          name: 'Bcd.txt', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: 'ｂｃｄ.txt', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: '12345.txt', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: '2345.txt', dir_id: grandchild_dir_id
+        },
+        {
+          name: '日本語でOK.txt', dir_id: grandchild_dir_id
+        },
+        {
+          name: '日本語でok.txt', dir_id: child2_dir_id
+        },
+        {
+          name: '金星語でOK.txt', dir_id: child2_dir_id
+        },
+        {
+          name: '謎のファイル１.nazo', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: '謎のファイル2.nazo', dir_id: grandchild_dir_id
+        },
+      ]
+      await Promise.all(file_names.map(async item => {
+        const result = await _upload_file([{ ...filesData.sample_file, name: item.name }], item.dir_id)
+      }))
+    })
+    const _compact_response = res_body => {
+      //return res_body.body.map(file => ({_id: file._id.toString(), name: file.name, dir_id: file.dir_id.toString()}))
+      return res_body.body.map(file => file.name) }
+    
+    it(`パラメータ不正'q is empty'の確認: query.qが空の場合はBadRequestエラー`, async () => {
+      const req = {
+        query: {
+          q: '',
+          page: 0,  // number
+          sort: 'modified', //column name
+          order: 'asc',  // 'asc' or 'desc'
+          is_display_unvisible: 'false' // 'true' or 'false'
+        },
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, status: jest.fn(() => ({ json: error_res_json })) }
+      await controller.search(req, res)
+
+      expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
+      expect(res_body.status.success).toBe(false)
+      expect(res_body.status.message).toBe("ファイル一覧の取得に失敗しました")
+      expect(res_body.status.errors.q).toBeTruthy() 
+    });
+
+    it(`英文字で検索し、昇順で取得`, async () => {
+      const req = {
+        query: {
+          q: 'bcd',
+          page: 0,  // number
+          sort: 'modified', //column name
+          order: 'asc',  // 'asc' or 'desc'
+          is_display_unvisible: 'false' // 'true' or 'false'
+        },
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await controller.search(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+          'bcd_dir',
+          'bcd_dir_2',
+          'bcd_dir_3',
+          'bcd.txt',
+          'bcd.txt',
+          'bcd.txt',
+          'bcd.txt'
+        ]))
+      }
+    })
+
+    it(`英文字で検索し、降順で取得`, async () => {
+      const req = {
+        query: {
+          q: 'bcd',
+          page: 0,  // number
+          //sort: 'name', //column name
+          sort: 'modified', //column name
+          order: 'desc',  // 'asc' or 'desc'
+          is_display_unvisible: 'false' // 'true' or 'false'
+        },
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await controller.search(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+          'bcd_dir_3',
+          'bcd_dir_2',
+          'bcd_dir',
+          'bcd.txt',
+          'bcd.txt',
+          'bcd.txt',
+          'bcd.txt',
+        ]))
+      }
+    })
+
+    it(`英文字で検索し、2ページ目を取得`, async () => {
+      const req = {
+        query: {
+          q: 'bcd',
+          page: 1,  // number
+          sort: 'name', //column name
+          order: 'desc',  // 'asc' or 'desc'
+          is_display_unvisible: 'false' // 'true' or 'false'
+        },
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await controller.search(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+        ]))
+      }
+    })
+
+    it(`数字で検索し、昇順で取得`, async () => {
+      const req = {
+        query: {
+          q: '2345',
+          page: 0,  // number
+          sort: 'modified', //column name
+          order: 'asc',  // 'asc' or 'desc'
+          is_display_unvisible: 'false' // 'true' or 'false'
+        },
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await controller.search(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+          '2345.txt',
+        ]))
+      }
+    })
+
+    it(`全角文字で検索し、昇順で取得`, async () => {
+      const req = {
+        query: {
+          q: '日本語',
+          page: 0,  // number
+          sort: 'modified', //column name
+          order: 'asc',  // 'asc' or 'desc'
+          is_display_unvisible: 'false' // 'true' or 'false'
+        },
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await controller.search(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+          '日本語でOK.txt',
+          '日本語でok.txt',
+        ]))
+      }
+    })
+  })
+  describe(`searchDetail()`, () => {
+    let child_dir_id
+    let child2_dir_id
+    let grandchild_dir_id
+    beforeAll(async () => {
+      let result
+      await updateAppSetting_InheritParentDirAuth(true)
+      // フォルダ作成
+      result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'bcd_dir')
+      child_dir_id = result.res.body._id
+      // フォルダ作成
+      result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'bcd_dir_2')
+      grandchild_dir_id = result.res.body._id
+      // フォルダ作成
+      result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'bcd_dir_3')
+      child2_dir_id = result.res.body._id
+      const file_names = [
+        {
+          name: 'bcd.txt', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: 'bcd.txt', dir_id: child_dir_id
+        },
+        {
+          name: 'bcd.txt', dir_id: child2_dir_id
+        },
+        {
+          name: 'bcd.txt', dir_id: grandchild_dir_id
+        },
+        {
+          name: 'Bcd.txt', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: 'ｂｃｄ.txt', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: '12345.txt', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: '2345.txt', dir_id: grandchild_dir_id
+        },
+        {
+          name: '日本語でOK.txt', dir_id: grandchild_dir_id
+        },
+        {
+          name: '日本語でok.txt', dir_id: child2_dir_id
+        },
+        {
+          name: '金星語でOK.txt', dir_id: child2_dir_id
+        },
+        {
+          name: '謎のファイル１.nazo', dir_id: initData.tenant.home_dir_id
+        },
+        {
+          name: '謎のファイル2.nazo', dir_id: grandchild_dir_id
+        },
+      ]
+      await Promise.all(file_names.map(async item => {
+        const result = await _upload_file([{ ...filesData.sample_file, name: item.name }], item.dir_id)
+      }))
+    })
+    
+  })
 });
 
