@@ -220,7 +220,6 @@ export const tree = async (req, res, next) => {
 };
 
 export const create = async (req, res, next) => {
-//  co(function*(){
     try {
       const { dir_name } = req.body;
       let dir_id = req.body.dir_id;
@@ -341,8 +340,7 @@ export const create = async (req, res, next) => {
       if (_dir.length > 0) throw "name is duplication";
 
       const newDir =  await dir.save();
-      const newAuthorities = await Promise.all(authorityFiles.map( async af => await af.save() ));
-      // const { newDir, newAuthority} = yield { newDir: dir.save(), newAuthority: authority.save() };
+      const newAuthorities = await Promise.all(authorityFiles.map( async af => await af.save() ) );
 
       // elasticsearch index作成
       const { tenant_id }= res.user;
@@ -418,7 +416,6 @@ export const create = async (req, res, next) => {
         }
       });
     }
- // });
 };
 
 export const move = async (req, res, next) => {
