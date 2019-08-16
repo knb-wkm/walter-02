@@ -52,7 +52,7 @@ describe('lib/controllers/dirs', () => {
     }
   }
 
-  // files.addAuthoritya()のラッパー
+  // files.addAuthority()のラッパー
   const _add_authority = async (file_id, user, group, role) => {
     const req = {
       params: { file_id },
@@ -86,6 +86,48 @@ describe('lib/controllers/dirs', () => {
     }
   }
 
+  // Dirs.view()のラッパー 
+  const _view_dir = async dir_id => {
+    const req = {
+      params: { dir_id },
+    }
+    const error_res_json = jest.fn()
+    const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+    await controller.view(req, res)
+    if (res.json.mock.calls.length === 0) {
+      return { success: false, errors: error_res_json.mock.calls[0][0].status.errors}
+    } else {
+      return { success: true, res: res.json.mock.calls[0][0] }
+    }
+  }
+
+  const _clear_file_auth = async file_id => {
+    const authes = await AuthorityFile.find({ files: file_id })
+    for (let i = 0; i < authes.length; i++){
+      const req = {
+        params: { file_id },
+        query: {
+          user_id: authes[i].user_id,
+          group_id: authes[i].group_id,
+          role_id: authes[i].role_id,
+        }
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await files_controller.removeAuthority(req, res)
+    }
+  }
+
+  const _create_dir_with_simpleauth = async (action_user, dir_id, dir_name) => {
+    let result
+    result = await _create_dir(action_user, dir_id, dir_name)
+    const file_id = result.res.body._id 
+    // ここで権限を全て剥奪
+    await _clear_file_auth(file_id) 
+    console.log(result)
+    return (await _view_dir(file_id))
+  }
+
   describe(`create()`, () => {
     beforeAll(async () => {
     })
@@ -103,7 +145,7 @@ describe('lib/controllers/dirs', () => {
       expect(res_body.status.message).toBe("フォルダの作成に失敗しました")
     })
 
-    it(`パラメータ不正'dir_id is empty'の確認： body.dir_nameが空の場合はBadRequestエラー`, async () => {
+    it(`パラメータ不正'dir_name is empty'の確認： body.dir_nameが空の場合はBadRequestエラー`, async () => {
       const req = {
         body: { dir_id: initData.tenant.home_dir_id, dir_name: null }
       }
@@ -387,9 +429,97 @@ describe('lib/controllers/dirs', () => {
       }
     })
   })
+
   describe(`tree()`, () => {
+    it(`パラメータ不正'root_id is empty'の確認： params.dir_idが不正の場合はBadRequestエラー`, async () => {
+      let file_id 
+      const req = {
+        query: { root_id: null },
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await controller.tree(req, res)
+      expect(res.status.mock.calls[0][0]).toBe(400) // http response statusは400
+      const res_body = error_res_json.mock.calls[0][0] //1回目の第一引数
+      expect(res_body.status.success).toBe(false)
+      expect(res_body.status.message).toBe("フォルダツリーの取得に失敗しました")
+    })
+
+    it(`子孫ファイルを持つフォルダのtreeの取得成功を確認: `, async () => {
+      let root_dir_id 
+      let child_dir_id 
+      let child2_dir_id 
+      let child3_dir_id 
+      let child_file_id 
+      let grandchild_file_id
+      let grandchild_dir_id
+      
+      await (async() => {
+        let result
+        // フォルダ作成
+        result = await _create_dir({ ...initData.user }, initData.tenant.home_dir_id, 'tree_top_'+ testHelper.getUUID())
+        root_dir_id = result.res.body._id
+        // フォルダへ権限追加
+        result = await _add_authority(root_dir_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
+        // ファイルアップロード
+        result = await _upload_file([{ ...filesData.sample_file }], root_dir_id)
+        child_file_id = result.res.body[0]._id
+        // フォルダ作成
+        result = await _create_dir({ ...initData.user }, root_dir_id, testHelper.getUUID())
+        child_dir_id = result.res.body._id
+        // フォルダ作成
+        result = await _create_dir({ ...initData.user }, root_dir_id, testHelper.getUUID())
+        child2_dir_id = result.res.body._id
+        // フォルダ作成(操作権限のない)
+        //result = await _create_dir_with_simpleauth({ ...initData.user_readolny }, root_dir_id, testHelper.getUUID())
+        //child3_dir_id = result.res.body._id
+        // ファイルアップロード
+        result = await _upload_file([{ ...filesData.sample_file }], child_dir_id)
+        grandchild_file_id = result.res.body[0]._id
+        // フォルダ作成
+        result = await _create_dir({ ...initData.user }, child_dir_id, testHelper.getUUID())
+        grandchild_dir_id = result.res.body._id
+        const req = {
+          params: { file_id: root_dir_id },
+        }
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+        await files_controller.moveTrash(req, res)
+      })()
+
+       let req = {
+        query: { root_id: root_dir_id },
+      }
+      let error_res_json = jest.fn()
+      let res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await controller.tree(req, res) // root_dir_idのchildrenを取得
+      if (res.json.mock.calls.length === 0) {
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        expect(_.union(res_body.body.children.map(c => c._id.toString()), [child_dir_id.toString(), child2_dir_id.toString() ]).length).toBe(2)
+      }
+
+      req = {
+        query: { root_id: child_dir_id },
+      }
+      error_res_json = jest.fn()
+      res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await controller.tree(req, res) // root_dir_idのchildrenを取得
+      if (res.json.mock.calls.length === 0) {
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        console.log(res_body.body.children)
+        expect(_.union(res_body.body.children.map(c => c._id.toString()), [grandchild_dir_id.toString() ]).length).toBe(1)
+      }
+    })
   })
-  describe(`index?()`, () => {
+    
+
+  describe(`index()は未使用`, () => {
   })
 
 });
