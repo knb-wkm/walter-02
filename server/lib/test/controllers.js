@@ -3,12 +3,15 @@ import * as file_controller from "../controllers/files";
 import * as dir_controller from "../controllers/dirs";
 import * as metainfo_controller from "../controllers/metaInfos";
 
+import AuthorityFile from "../models/AuthorityFile";
 
 
 class TestControllers {
   constructor(user, tenant) {
+    this.defaultUser = user
+    this.defaultTenant = tenant
     this.default_res = {
-      user: { ...user, tenant_id: tenant._id, tenant: { ...tenant } }
+      user: { ...this.defaultUser, tenant_id: this.defaultTenant._id, tenant: { ...this.defaultTenant } }
     }
   }
 
@@ -52,12 +55,12 @@ class TestControllers {
     }
   }
   
-  async uploadFile(files_array, dir_id){
+  async uploadFile(user, files_array, dir_id){
     const req = {
       body: { files: files_array, dir_id }
     }
     const error_res_json = jest.fn()
-    const res = { user: { ...this.default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+    const res = { user: { ...user, tenant_id: this.defaultTenant._id, tenant: { ...this.defaultTenant } }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
     await file_controller.upload(req, res)
     if (res.json.mock.calls.length === 0) {
       return { success: false, errors: error_res_json.mock.calls[0][0].status.errors }
@@ -102,13 +105,27 @@ class TestControllers {
   }
 
   // Dirs.view()のラッパー 
-  async viewDir(dir_id){
+  async viewDir(user, dir_id){
     const req = {
       params: { dir_id },
     }
     const error_res_json = jest.fn()
-    const res = { user: { ...this.default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+    const res = { user: { ...user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
     await dir_controller.view(req, res)
+    if (res.json.mock.calls.length === 0) {
+      return { success: false, errors: error_res_json.mock.calls[0][0].status.errors }
+    } else {
+      return { success: true, res: res.json.mock.calls[0][0] }
+    }
+  }
+
+  async viewFile(user, file_id) {
+    const req = {
+      params: { file_id }
+    }
+    const error_res_json = jest.fn()
+    const res = { user: { ...user, tenant_id: this.defaultTenant._id, tenant: { ...this.defaultTenant } }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+    await file_controller.view(req, res)
     if (res.json.mock.calls.length === 0) {
       return { success: false, errors: error_res_json.mock.calls[0][0].status.errors }
     } else {
@@ -130,6 +147,45 @@ class TestControllers {
     await metainfo_controller.add(req, res)
     const res_body = res.json.mock.calls[0][0] //1回目の第一引数
     return res_body.body
-  }}
+  }
+
+  async clearFileAuth(file_id){
+    const authes = await AuthorityFile.find({ files: file_id })
+    for (let i = 0; i < authes.length; i++){
+      const req = {
+        params: { file_id },
+        query: {
+          user_id: authes[i].users,
+          group_id: authes[i].groups,
+          role_id: authes[i].role_files,
+        }
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...this.default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await file_controller.removeAuthority(req, res)
+    }
+  }
+
+  // 作成ユーザーのフルコントロールのみの権限を持つdirを作成
+  async createDirWithSimpleauth(action_user, dir_id, dir_name){
+    let result
+    result = await this.createDir(action_user, dir_id, dir_name)
+    const file_id = result.res.body._id 
+    // ここで権限を全て剥奪
+    await this.clearFileAuth(file_id) 
+    return (await this.viewDir(action_user, file_id))
+  }
+
+  // 作成ユーザーのフルコントロールのみの権限を持つfileを作成
+  async uploadFileWithSimpleauth(action_user, files_array, dir_id){
+    let result
+    result = await this.uploadFile({ ...action_user }, files_array, dir_id)
+    const file_id = result.res.body[0]._id
+    // ここで権限を全て剥奪
+    await this.clearFileAuth(file_id)
+    return (await this.viewFile(action_user, file_id))
+  }
+
+}
 
 export { TestControllers }
