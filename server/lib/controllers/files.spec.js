@@ -66,7 +66,7 @@ describe('lib/controllers/files', () => {
 
     it(`1ファイルupload成功の確認(appSettings.inherit_parent_dir_auth === true): 1ファイルの情報が返り、その権限は親フォルダの権限を継承し、さらに操作ユーザーのフルコントロールが付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(true)
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         expect(result.res.status.success).toBe(true)
         expect(result.res.body.length).toBe(1) //１ファイルの結果が返る
@@ -82,7 +82,7 @@ describe('lib/controllers/files', () => {
 
     it(`3ファイルupload成功の確認(appSettings.inherit_parent_dir_auth === true): 3ファイルの情報が返り、その権限は親フォルダの権限を継承し、さらに操作ユーザーのフルコントロールが付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(true)
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }, { ...filesData.sample_file }, { ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }, { ...filesData.sample_file }, { ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         expect(result.res.status.success).toBe(true)
         expect(result.res.body.length).toBe(3) //3ファイルの結果が返る
@@ -98,7 +98,7 @@ describe('lib/controllers/files', () => {
 
     it(`1ファイルupload成功の確認(appSettings.inherit_parent_dir_auth === false): 1ファイルの情報が返り、その権限は操作ユーザーのフルコントロールのみ付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(false)
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         expect(result.res.status.success).toBe(true)
         expect(result.res.body.length).toBe(1) //１ファイルの結果が返る
@@ -111,7 +111,7 @@ describe('lib/controllers/files', () => {
 
     it(`3ファイルupload成功の確認(appSettings.inherit_parent_dir_auth === false): 3ファイルの情報が返り、その権限は操作ユーザーのフルコントロールのみ付加される`, async () => {
       await updateAppSetting_InheritParentDirAuth(false)
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }, { ...filesData.sample_file }, { ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }, { ...filesData.sample_file }, { ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         expect(result.res.status.success).toBe(true)
         expect(result.res.body.length).toBe(3) //3ファイルの結果が返る
@@ -130,7 +130,7 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       // 事前にファイルをアップロード
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         file_id = result.res.body[0]._id
       } else {
@@ -175,7 +175,7 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       // 事前にファイルをアップロード
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         file_id = result.res.body[0]._id
       } else {
@@ -237,7 +237,7 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       // 事前にファイルをアップロード
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         file_id = result.res.body[0]._id
       } else {
@@ -371,13 +371,13 @@ describe('lib/controllers/files', () => {
         result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, 'parent'+ testHelper.getUUID())
         parent_dir_id = result.res.body._id
         // 親フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], parent_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], parent_dir_id)
         child_file_id = result.res.body[0]._id
         // 親フォルダへ子フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, parent_dir_id, 'child')
         child_dir_id = result.res.body._id
          // 子フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
       })()
       const req = {
@@ -423,13 +423,13 @@ describe('lib/controllers/files', () => {
         result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, 'parent'+ testHelper.getUUID())
         parent_dir_id = result.res.body._id
         // 親フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], parent_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], parent_dir_id)
         child_file_id = result.res.body[0]._id
         // 親フォルダへ子フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, parent_dir_id, 'child')
         child_dir_id = result.res.body._id
          // 子フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
       })()
       const req = {
@@ -471,7 +471,7 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       // 事前にファイルをアップロード
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         file_id = result.res.body[0]._id
         const result2 = await testControllers.addAuthority(file_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
@@ -620,13 +620,13 @@ describe('lib/controllers/files', () => {
         result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, 'parent'+ testHelper.getUUID())
         parent_dir_id = result.res.body._id
         // 親フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], parent_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], parent_dir_id)
         child_file_id = result.res.body[0]._id
         // 親フォルダへ子フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, parent_dir_id, 'child')
         child_dir_id = result.res.body._id
          // 子フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
         result = await testControllers.addAuthority(parent_dir_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
       })()
@@ -674,13 +674,13 @@ describe('lib/controllers/files', () => {
         result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, 'parent'+ testHelper.getUUID())
         parent_dir_id = result.res.body._id
         // 親フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], parent_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], parent_dir_id)
         child_file_id = result.res.body[0]._id
         // 親フォルダへ子フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, parent_dir_id, 'child')
         child_dir_id = result.res.body._id
          // 子フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
         result = await testControllers.addAuthority(parent_dir_id, null, { ...initData.groupMgr }, { ...initData.roleFileReadonly })
       })()
@@ -724,7 +724,7 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       // 事前にファイルをアップロード
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         file_id = result.res.body[0]._id
         tag_id = (await Tag.findOne({}))._id
@@ -788,7 +788,7 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       // 事前にファイルをアップロード
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         file_id = result.res.body[0]._id
         tag_id = (await Tag.findOne({}))._id
@@ -858,7 +858,7 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       // 事前にファイルをアップロード
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         file_id = result.res.body[0]._id
         meta = await testControllers.addMetainfo(testHelper.getUUID(), testHelper.getUUID(),'String')
@@ -939,7 +939,7 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       // 事前にファイルをアップロード
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         file_id = result.res.body[0]._id
         meta = await testControllers.addMetainfo(testHelper.getUUID(),testHelper.getUUID(),'String')
@@ -1007,7 +1007,7 @@ describe('lib/controllers/files', () => {
     beforeAll(async () => {
       await updateAppSetting_InheritParentDirAuth(true)
       // 事前にファイルをアップロード
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       if (result.success) {
         file_id = result.res.body[0]._id
       } else {
@@ -1091,7 +1091,7 @@ describe('lib/controllers/files', () => {
       await (async() => {
         let result
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
         file_id = result.res.body[0]._id
         is_trash_org = result.res.body[0].is_trash 
         // ファイルへ権限追加
@@ -1132,13 +1132,13 @@ describe('lib/controllers/files', () => {
         // フォルダへ権限追加
         result = await testControllers.addAuthority(file_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], file_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], file_id)
         child_file_id = result.res.body[0]._id
         // フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, file_id, testHelper.getUUID())
         child_dir_id = result.res.body._id
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
       })()
       const req = {
@@ -1194,7 +1194,7 @@ describe('lib/controllers/files', () => {
     });
 
     it(`パラメータ不正'dir_id is empty'の確認: params.body.dir_idが空の場合はBadRequestエラー`, async () => {
-      const result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+      const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
       const file_id = result.res.body[0]._id
       const req = {
         params: { file_id },
@@ -1218,7 +1218,7 @@ describe('lib/controllers/files', () => {
       await (async() => {
         let result
         // TOPフォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
         file_id = result.res.body[0]._id
         // TOP直下へフォルダ作成
         result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, 'parent'+ testHelper.getUUID())
@@ -1262,7 +1262,7 @@ describe('lib/controllers/files', () => {
         // フォルダへ権限追加
         result = await testControllers.addAuthority(child_dir_id, null, { ...initData.groupMgr }, { ...initData.roleFileReadonly })
         // TOPフォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.home_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.home_dir_id)
         file_id = result.res.body[0]._id
       })()
       const req = {
@@ -1301,7 +1301,7 @@ describe('lib/controllers/files', () => {
         // フォルダへ権限追加
         result = await testControllers.addAuthority(child_dir_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
         // 親フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         file_id = result.res.body[0]._id
       })()
       const req = {
@@ -1340,7 +1340,7 @@ describe('lib/controllers/files', () => {
         // 親フォルダへ権限追加
         result = await testControllers.addAuthority(child_dir_id, null, { ...initData.groupMgr }, { ...initData.roleFileReadonly })
         // 親フォルダへファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         file_id = result.res.body[0]._id
       })()
       const req = {
@@ -1374,7 +1374,7 @@ describe('lib/controllers/files', () => {
       await (async() => {
         let result
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], file_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], file_id)
         file_id = result.res.body[0]._id
         // フォルダへ権限追加
         result = await testControllers.addAuthority(file_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
@@ -1443,7 +1443,7 @@ describe('lib/controllers/files', () => {
       let file_id 
       let result
       // ファイルアップロード
-      result = await testControllers.uploadFile([{ ...filesData.sample_file }], initData.tenant.trash_dir_id)
+      result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], initData.tenant.trash_dir_id)
       file_id = result.res.body[0]._id
       const req = {
         params: { file_id },
@@ -1475,13 +1475,13 @@ describe('lib/controllers/files', () => {
         // フォルダへ権限追加
         result = await testControllers.addAuthority(file_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], file_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], file_id)
         child_file_id = result.res.body[0]._id
         // フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, file_id, testHelper.getUUID())
         child_dir_id = result.res.body._id
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
       })()
       const req = {
@@ -1505,14 +1505,23 @@ describe('lib/controllers/files', () => {
     })
   })
 
-  describe.only(`search()`, () => {
+  const _compact_response = res_body => {
+    //return res_body.body.map(file => ({_id: file._id.toString(), name: file.name, dir_id: file.dir_id.toString()}))
+    return res_body.body.map(file => file.name)
+  }
+    
+  describe(`search()`, () => {
     let child_dir_id
     let child2_dir_id
+    let child3_dir_id
     let grandchild_dir_id
-    const folderNames = ['bcd_dir_1_' + testHelper.getUUID(),'bcd_dir_2_' + testHelper.getUUID(),'bcd_dir_3_' + testHelper.getUUID(),]
+    const folderNames = ['bcd_dir_1_' + testHelper.getUUID(),'bcd_dir_2_' + testHelper.getUUID(),'bcd_dir_3_' + testHelper.getUUID(),'bcd_dir_4_' + testHelper.getUUID(),]
     beforeAll(async () => {
       let result
       await updateAppSetting_InheritParentDirAuth(true)
+      // 別ユーザーの作成
+      result = await testControllers.addUserInGroup(testHelper.getUUID(), initData.roleMenuMgr._id, initData.groupMgr._id)
+      const other_user = result.res.toObject()
       // フォルダ作成
       result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[0])
       child_dir_id = result.res.body._id
@@ -1522,6 +1531,11 @@ describe('lib/controllers/files', () => {
       // フォルダ作成
       result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[2])
       child2_dir_id = result.res.body._id
+      // フォルダ作成(操作権限のない)
+      result = await testControllers.createDirWithSimpleauth({ ...other_user }, initData.tenant.home_dir_id, folderNames[3])
+      child3_dir_id = result.res.body._id
+      // ファイルアップロード(操作権限のない)
+      result = await testControllers.uploadFileWithSimpleauth({ ...other_user }, [{ ...filesData.sample_file, name: 'bcd__.txt' }], child_dir_id)
       const file_names = [
         {
           name: 'bcd.txt', dir_id: initData.tenant.home_dir_id
@@ -1564,13 +1578,10 @@ describe('lib/controllers/files', () => {
         },
       ]
       await Promise.all(file_names.map(async item => {
-        const result = await testControllers.uploadFile([{ ...filesData.sample_file, name: item.name }], item.dir_id)
+        const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file, name: item.name }], item.dir_id)
       }))
     })
-    const _compact_response = res_body => {
-      //return res_body.body.map(file => ({_id: file._id.toString(), name: file.name, dir_id: file.dir_id.toString()}))
-      return res_body.body.map(file => file.name) }
-    
+
     it(`パラメータ不正'q is empty'の確認: query.qが空の場合はBadRequestエラー`, async () => {
       const req = {
         query: {
@@ -1725,22 +1736,33 @@ describe('lib/controllers/files', () => {
       }
     })
   })
+
   describe(`searchDetail()`, () => {
     let child_dir_id
     let child2_dir_id
+    let child3_dir_id
     let grandchild_dir_id
+    const folderNames = ['bcd_dir_1_' + testHelper.getUUID(),'bcd_dir_2_' + testHelper.getUUID(),'bcd_dir_3_' + testHelper.getUUID(),'bcd_dir_4_' + testHelper.getUUID(),]
     beforeAll(async () => {
       let result
       await updateAppSetting_InheritParentDirAuth(true)
+      // 別ユーザーの作成
+      result = await testControllers.addUserInGroup(testHelper.getUUID(), initData.roleMenuMgr._id, initData.groupMgr._id)
+      const other_user = result.res.toObject()
       // フォルダ作成
-      result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, 'bcd_dir')
+      result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[0])
       child_dir_id = result.res.body._id
       // フォルダ作成
-      result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, 'bcd_dir_2')
+      result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[1])
       grandchild_dir_id = result.res.body._id
       // フォルダ作成
-      result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, 'bcd_dir_3')
+      result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[2])
       child2_dir_id = result.res.body._id
+      // フォルダ作成(操作権限のない)
+      result = await testControllers.createDirWithSimpleauth({ ...other_user }, initData.tenant.home_dir_id, folderNames[3])
+      child3_dir_id = result.res.body._id
+      // ファイルアップロード(操作権限のない)
+      result = await testControllers.uploadFileWithSimpleauth({ ...other_user }, [{ ...filesData.sample_file, name: 'bcd__.txt' }], child_dir_id)
       const file_names = [
         {
           name: 'bcd.txt', dir_id: initData.tenant.home_dir_id
@@ -1783,10 +1805,44 @@ describe('lib/controllers/files', () => {
         },
       ]
       await Promise.all(file_names.map(async item => {
-        const result = await testControllers.uploadFile([{ ...filesData.sample_file, name: item.name }], item.dir_id)
+        const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file, name: item.name }], item.dir_id)
       }))
     })
     
+    it(`英文字で検索し、昇順で取得`, async () => {
+      const req = {
+        body: {
+          queries: [{
+            meta_info_id: null,
+            search_value_type: 'String',
+            value: 'test'
+          }],
+          page: 0,  // number
+          sort: 'modified', //column name
+          order: 'asc',  // 'asc' or 'desc'
+          is_display_unvisible: 'false' // 'true' or 'false'
+        },
+      }
+      const error_res_json = jest.fn()
+      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+      await file_controller.searchDetail(req, res)
+      if (res.json.mock.calls.length === 0) {
+        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+      } else {
+        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+        expect(res_body.status.success).toBe(true)
+        expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+          folderNames[0],
+          folderNames[1],
+          folderNames[2],
+          'bcd.txt',
+          'bcd.txt',
+          'bcd.txt',
+          'bcd.txt'
+        ]))
+      }
+    })
+
   })
 });
 

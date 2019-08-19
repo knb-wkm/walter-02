@@ -47,9 +47,9 @@ describe('lib/controllers/dirs', () => {
       const req = {
         params: { file_id },
         query: {
-          user_id: authes[i].user_id,
-          group_id: authes[i].group_id,
-          role_id: authes[i].role_id,
+          user_id: authes[i].users,
+          group_id: authes[i].groups,
+          role_id: authes[i].role_files,
         }
       }
       const error_res_json = jest.fn()
@@ -64,8 +64,7 @@ describe('lib/controllers/dirs', () => {
     const file_id = result.res.body._id 
     // ここで権限を全て剥奪
     await _clear_file_auth(file_id) 
-    console.log(result)
-    return (await _view_dir(file_id))
+    return (await testControllers.viewDir(action_user, file_id))
   }
 
   describe(`create()`, () => {
@@ -197,13 +196,13 @@ describe('lib/controllers/dirs', () => {
         // フォルダへ権限追加
         result = await testControllers.addAuthority(file_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], file_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], file_id)
         child_file_id = result.res.body[0]._id
         // フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, file_id, testHelper.getUUID())
         child_dir_id = result.res.body._id
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
         // 移動先フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, 'topsub_'+ testHelper.getUUID())
@@ -255,13 +254,13 @@ describe('lib/controllers/dirs', () => {
         // フォルダへ権限追加
         result = await testControllers.addAuthority(file_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], file_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], file_id)
         child_file_id = result.res.body[0]._id
         // フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, file_id, testHelper.getUUID())
         child_dir_id = result.res.body._id
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
         const req = {
           params: { file_id },
@@ -402,7 +401,7 @@ describe('lib/controllers/dirs', () => {
         // フォルダへ権限追加
         result = await testControllers.addAuthority(root_dir_id, { ...initData.user }, null, { ...initData.roleFileReadonly })
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], root_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], root_dir_id)
         child_file_id = result.res.body[0]._id
         // フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, root_dir_id, testHelper.getUUID())
@@ -411,10 +410,15 @@ describe('lib/controllers/dirs', () => {
         result = await testControllers.createDir({ ...initData.user }, root_dir_id, testHelper.getUUID())
         child2_dir_id = result.res.body._id
         // フォルダ作成(操作権限のない)
-        //result = await testControllers.createDir_with_simpleauth({ ...initData.user_readolny }, root_dir_id, testHelper.getUUID())
-        //child3_dir_id = result.res.body._id
+        result = await testControllers.addUserInGroup(testHelper.getUUID(), initData.roleMenuMgr._id, initData.groupMgr._id)
+        const other_user = result.res.toObject()
+        result = await testControllers.createDirWithSimpleauth({ ...other_user }, root_dir_id, testHelper.getUUID())
+        child3_dir_id = result.res.body._id
+        // ファイルアップロード(操作権限のない)
+        result = await testControllers.uploadFileWithSimpleauth({ ...other_user }, [{ ...filesData.sample_file }], root_dir_id)
+        //child2_file_id = result.res.body[0]._id
         // ファイルアップロード
-        result = await testControllers.uploadFile([{ ...filesData.sample_file }], child_dir_id)
+        result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file }], child_dir_id)
         grandchild_file_id = result.res.body[0]._id
         // フォルダ作成
         result = await testControllers.createDir({ ...initData.user }, child_dir_id, testHelper.getUUID())
@@ -452,7 +456,6 @@ describe('lib/controllers/dirs', () => {
       } else {
         const res_body = res.json.mock.calls[0][0] //1回目の第一引数
         expect(res_body.status.success).toBe(true)
-        console.log(res_body.body.children)
         expect(_.union(res_body.body.children.map(c => c._id.toString()), [grandchild_dir_id.toString() ]).length).toBe(1)
       }
     })
