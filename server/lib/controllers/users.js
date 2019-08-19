@@ -138,8 +138,8 @@ export const view = (req, res, next) => {
   });
 };
 
-export const add = (req, res, next) => {
-  co(function*() {
+export const add = async (req, res, next) => {
+//  co(function*() {
     try {
       const user = new User(req.body.user);
       const { tenant_id } = res.user;
@@ -183,7 +183,7 @@ export const add = (req, res, next) => {
           || role_id === null
           || role_id === "") throw "role_id is empty";
 
-      let _user = yield User.findOne({ account_name: user.account_name });
+      let _user = await User.findOne({ account_name: user.account_name });
       if (_user !== null) throw "account_name is duplicate";
 
       // _user = yield User.findOne({ email: user.email });
@@ -197,16 +197,15 @@ export const add = (req, res, next) => {
       authority_menus.users = user;
       authority_menus.groups = null;
 
-      const {createdUser,createdAuthorityMenu} = yield { createdUser:user.save(), createdAuthorityMenu:authority_menus.save() };
+      const createdUser = await user.save()
+      const createdAuthorityMenu = await authority_menus.save()
 
       res.json({
         status: { success: true },
         body: createdUser
       });
-    }
-    catch (err) {
+    }catch (err) {
       let errors = {};
-
       switch (err) {
       case "name is empty":
         errors.name = "表示名が空のためユーザの作成に失敗しました";
@@ -247,7 +246,7 @@ export const add = (req, res, next) => {
         status: { success: false, message: "ユーザの作成に失敗しました",errors }
       });
     }
-  });
+//  });
 };
 
 export const updatePassword = (req, res, next) => {
@@ -533,43 +532,40 @@ export const updateEmail = (req, res, next) => {
   });
 };
 
-export const addUserToGroup = (req, res, next) => {
-  co(function* () {
-    try {
-      const user_id = req.params.user_id;
-      const group_id = req.body.group_id;
+export const addUserToGroup = async (req, res, next) => {
+  try {
+    const user_id = req.params.user_id;
+    const group_id = req.body.group_id;
 
-      if (! mongoose.Types.ObjectId.isValid(user_id)) throw "user_id is invalid";
+    if (!mongoose.Types.ObjectId.isValid(user_id)) throw "user_id is invalid";
 
-      if (group_id === undefined || group_id === null || group_id === "") {
-        throw "group_id is empty";
-      }
-
-      if (! mongoose.Types.ObjectId.isValid(group_id)) throw "group_id is invalid";
-
-      const [ user, group ] = yield [
-        User.findById(user_id),
-        Group.findById(group_id)
-      ];
-
-      if (user === null) throw `存在しないユーザです user_id: ${user_id}`;
-      if (group === null) throw `存在しないグループです group_id: ${group_id}`;
-
-      if (user.groups.filter( id => id.toString() === group_id ).length > 0) throw "group_id is already exists";
-
-      user.groups = [ ...user.groups, group._id ];
-
-      const changedUser = yield user.save();
-
-      res.json({
-        status: { success: true },
-        body: changedUser
-      });
+    if (group_id === undefined || group_id === null || group_id === "") {
+      throw "group_id is empty";
     }
-    catch (err) {
-      let errors = {};
 
-      switch(err) {
+    if (!mongoose.Types.ObjectId.isValid(group_id)) throw "group_id is invalid";
+
+    const user = await User.findById(user_id)
+    const group = await Group.findById(group_id)
+
+    if (user === null) throw `存在しないユーザです user_id: ${user_id}`;
+    if (group === null) throw `存在しないグループです group_id: ${group_id}`;
+
+    if (user.groups.filter(id => id.toString() === group_id).length > 0) throw "group_id is already exists";
+
+    user.groups = [...user.groups, group._id];
+
+    const changedUser = await user.save();
+
+    res.json({
+      status: { success: true },
+      body: changedUser
+    });
+  }
+  catch (err) {
+    let errors = {};
+
+    switch (err) {
       case "user_id is invalid":
         errors.user_id = "ユーザIDが不正のためグループの追加に失敗しました";
         break;
@@ -585,46 +581,42 @@ export const addUserToGroup = (req, res, next) => {
       default:
         errors.unknown = err;
         break;
-      }
-      res.status(400).json({
-        status: { success: false, message: "グループの追加に失敗しました", errors }
-      });
     }
-  });
+    res.status(400).json({
+      status: { success: false, message: "グループの追加に失敗しました", errors }
+    });
+  }
 };
 
-export const removeUserOfGroup = (req, res, next) => {
-  co(function* () {
-    try {
-      const { user_id, group_id } = req.params;
+export const removeUserOfGroup = async (req, res, next) => {
+  try {
+    const { user_id, group_id } = req.params;
 
-      if (! mongoose.Types.ObjectId.isValid(user_id)) throw "user_id is invalid";
-      if (! mongoose.Types.ObjectId.isValid(group_id)) throw "group_id is invalid";
+    if (!mongoose.Types.ObjectId.isValid(user_id)) throw "user_id is invalid";
+    if (!mongoose.Types.ObjectId.isValid(group_id)) throw "group_id is invalid";
 
-      const [ user, group ] = yield [
-        User.findById(user_id),
-        Group.findById(group_id)
-      ];
+    const user = await User.findById(user_id)
+    const group = await Group.findById(group_id)
 
-      if (user === null) throw "user is empty";
-      if (group === null) throw "group is empty";
+    if (user === null) throw "user is empty";
+    if (group === null) throw "group is empty";
 
-      const filtered = user.groups.filter( _group => _group.toString() !== group._id.toString() );
+    const filtered = user.groups.filter(_group => _group.toString() !== group._id.toString());
 
-      if (user.groups.length === filtered.length) throw "group_id is not found";
+    if (user.groups.length === filtered.length) throw "group_id is not found";
 
-      user.groups = filtered;
+    user.groups = filtered;
 
-      const changedUser = yield user.save();
-      res.json({
-        status: { success: true },
-        body: changedUser
-      });
-    }
-    catch (e) {
-      let errors = {};
+    const changedUser = await user.save();
+    res.json({
+      status: { success: true },
+      body: changedUser
+    });
+  }
+  catch (e) {
+    let errors = {};
 
-      switch(e) {
+    switch (e) {
       case "user_id is invalid":
         errors.user_id = "ユーザIDが不正のためグループのメンバ削除に失敗しました";
         break;
@@ -637,16 +629,15 @@ export const removeUserOfGroup = (req, res, next) => {
       default:
         errors.unknown = e;
         break;
-      }
-      res.status(400).json({
-        status: {
-          success: false,
-          message: "グループのメンバ削除に失敗しました",
-          errors
-        }
-      });
     }
-  });
+    res.status(400).json({
+      status: {
+        success: false,
+        message: "グループのメンバ削除に失敗しました",
+        errors
+      }
+    });
+  }
 };
 
 export const updateAccountName = (req, res, next) => {
