@@ -149,6 +149,18 @@ class TestControllers {
     return res_body.body
   }
 
+  // toggleStar()のラッパー
+  async toggleStar(file_id){
+    const req = {
+      params: { file_id },
+    }
+    const error_res_json = jest.fn()
+    const res = { user: { ...this.default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+    await file_controller.toggleStar(req, res)
+    const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+    return res_body.body
+  }
+
   async clearFileAuth(file_id){
     const authes = await AuthorityFile.find({ files: file_id })
     for (let i = 0; i < authes.length; i++){

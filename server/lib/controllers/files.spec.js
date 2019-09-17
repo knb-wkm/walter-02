@@ -2,9 +2,8 @@ import * as memMongo from "../test/memmongo";
 
 import * as _ from "lodash";
 
+import moment from "moment";
 import * as file_controller from "../controllers/files";
-import * as dir_controller from "../controllers/dirs";
-import * as metainfo_controller from "../controllers/metaInfos";
 
 import * as filesData from "../test/filesdata";
 import * as testHelper from "../test/helper";
@@ -1738,111 +1737,247 @@ describe('lib/controllers/files', () => {
   })
 
   describe(`searchDetail()`, () => {
-    let child_dir_id
-    let child2_dir_id
-    let child3_dir_id
-    let grandchild_dir_id
-    const folderNames = ['bcd_dir_1_' + testHelper.getUUID(),'bcd_dir_2_' + testHelper.getUUID(),'bcd_dir_3_' + testHelper.getUUID(),'bcd_dir_4_' + testHelper.getUUID(),]
-    beforeAll(async () => {
-      let result
-      await updateAppSetting_InheritParentDirAuth(true)
-      // 別ユーザーの作成
-      result = await testControllers.addUserInGroup(testHelper.getUUID(), initData.roleMenuMgr._id, initData.groupMgr._id)
-      const other_user = result.res.toObject()
-      // フォルダ作成
-      result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[0])
-      child_dir_id = result.res.body._id
-      // フォルダ作成
-      result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[1])
-      grandchild_dir_id = result.res.body._id
-      // フォルダ作成
-      result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[2])
-      child2_dir_id = result.res.body._id
-      // フォルダ作成(操作権限のない)
-      result = await testControllers.createDirWithSimpleauth({ ...other_user }, initData.tenant.home_dir_id, folderNames[3])
-      child3_dir_id = result.res.body._id
-      // ファイルアップロード(操作権限のない)
-      result = await testControllers.uploadFileWithSimpleauth({ ...other_user }, [{ ...filesData.sample_file, name: 'bcd__.txt' }], child_dir_id)
-      const file_names = [
-        {
-          name: 'bcd.txt', dir_id: initData.tenant.home_dir_id
-        },
-        {
-          name: 'bcd.txt', dir_id: child_dir_id
-        },
-        {
-          name: 'bcd.txt', dir_id: child2_dir_id
-        },
-        {
-          name: 'bcd.txt', dir_id: grandchild_dir_id
-        },
-        {
-          name: 'Bcd.txt', dir_id: initData.tenant.home_dir_id
-        },
-        {
-          name: 'ｂｃｄ.txt', dir_id: initData.tenant.home_dir_id
-        },
-        {
-          name: '12345.txt', dir_id: initData.tenant.home_dir_id
-        },
-        {
-          name: '2345.txt', dir_id: grandchild_dir_id
-        },
-        {
-          name: '日本語でOK.txt', dir_id: grandchild_dir_id
-        },
-        {
-          name: '日本語でok.txt', dir_id: child2_dir_id
-        },
-        {
-          name: '金星語でOK.txt', dir_id: child2_dir_id
-        },
-        {
-          name: '謎のファイル１.nazo', dir_id: initData.tenant.home_dir_id
-        },
-        {
-          name: '謎のファイル2.nazo', dir_id: grandchild_dir_id
-        },
-      ]
-      await Promise.all(file_names.map(async item => {
-        const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file, name: item.name }], item.dir_id)
-      }))
-    })
-    
-    it(`英文字で検索し、昇順で取得`, async () => {
-      const req = {
-        body: {
-          queries: [{
-            meta_info_id: null,
-            search_value_type: 'String',
-            value: 'test'
-          }],
-          page: 0,  // number
-          sort: 'modified', //column name
-          order: 'asc',  // 'asc' or 'desc'
-          is_display_unvisible: 'false' // 'true' or 'false'
-        },
-      }
-      const error_res_json = jest.fn()
-      const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
-      await file_controller.searchDetail(req, res)
-      if (res.json.mock.calls.length === 0) {
-        expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
-      } else {
-        const res_body = res.json.mock.calls[0][0] //1回目の第一引数
-        expect(res_body.status.success).toBe(true)
-        expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
-          folderNames[0],
-          folderNames[1],
-          folderNames[2],
-          'bcd.txt',
-          'bcd.txt',
-          'bcd.txt',
-          'bcd.txt'
-        ]))
-      }
+    describe(`ファイル名の検索`, () => {
+      let child_dir_id
+      let child2_dir_id
+      let child3_dir_id
+      let grandchild_dir_id
+      const folderNames = ['ghi_dir_1_' + testHelper.getUUID(), 'ghi_dir_2_' + testHelper.getUUID(), 'ghi_dir_3_' + testHelper.getUUID(), 'ghi_dir_4_' + testHelper.getUUID(),]
+      beforeAll(async () => {
+        let result
+        await updateAppSetting_InheritParentDirAuth(true)
+        // 別ユーザーの作成
+        result = await testControllers.addUserInGroup(testHelper.getUUID(), initData.roleMenuMgr._id, initData.groupMgr._id)
+        const other_user = result.res.toObject()
+        // フォルダ作成
+        result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[0])
+        child_dir_id = result.res.body._id
+        // フォルダ作成
+        result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[1])
+        grandchild_dir_id = result.res.body._id
+        // フォルダ作成
+        result = await testControllers.createDir({ ...initData.user }, initData.tenant.home_dir_id, folderNames[2])
+        child2_dir_id = result.res.body._id
+        // フォルダ作成(操作権限のない)
+        result = await testControllers.createDirWithSimpleauth({ ...other_user }, initData.tenant.home_dir_id, folderNames[3])
+        child3_dir_id = result.res.body._id
+        // ファイルアップロード(操作権限のない)
+        result = await testControllers.uploadFileWithSimpleauth({ ...other_user }, [{ ...filesData.sample_file, name: 'ghi__.txt' }], child_dir_id)
+        const file_names = [
+          {
+            name: 'ghi.txt', dir_id: initData.tenant.home_dir_id
+          },
+          {
+            name: 'ghi.txt', dir_id: child_dir_id
+          },
+          {
+            name: 'ghi.txt', dir_id: child2_dir_id
+          },
+          {
+            name: 'ghi.txt', dir_id: grandchild_dir_id
+          },
+          {
+            name: 'Ghi.txt', dir_id: initData.tenant.home_dir_id
+          },
+          {
+            name: 'ｇｈｉ.txt', dir_id: initData.tenant.home_dir_id
+          },
+        ]
+        await Promise.all(file_names.map(async item => {
+          const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file, name: item.name }], item.dir_id)
+        }))
+      })
+
+      it(`英文字で検索し、昇順で取得`, async () => {
+        const req = {
+          body: {
+            queries: [{
+              meta_info_id: null,
+              search_value_type: 'String',
+              value: 'ghi',
+              name: 'name'
+            }],
+            page: 0,  // number
+            sort: 'modified', //column name
+            order: 'asc',  // 'asc' or 'desc'
+            is_display_unvisible: 'false' // 'true' or 'false'
+          },
+        }
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+        await file_controller.searchDetail(req, res)
+        if (res.json.mock.calls.length === 0) {
+          expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+        } else {
+          const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+          expect(res_body.status.success).toBe(true)
+          expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+            folderNames[0],
+            folderNames[1],
+            folderNames[2],
+            'ghi.txt',
+            'ghi.txt',
+            'ghi.txt',
+            'ghi.txt',
+          ]))
+        }
+      })
+
+      it(`英文字で検索し、降順で取得`, async () => {
+        const req = {
+          body: {
+            queries: [{
+              meta_info_id: null,
+              search_value_type: 'String',
+              value: 'ghi',
+              name: 'name'
+            }],
+            page: 0,  // number
+            sort: 'modified', //column name
+            order: 'desc',  // 'asc' or 'desc'
+            is_display_unvisible: 'false' // 'true' or 'false'
+          },
+        }
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+        await file_controller.searchDetail(req, res)
+        if (res.json.mock.calls.length === 0) {
+          expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+        } else {
+          const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+          expect(res_body.status.success).toBe(true)
+          expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+            folderNames[2],
+            folderNames[1],
+            folderNames[0],
+            'ghi.txt',
+            'ghi.txt',
+            'ghi.txt',
+            'ghi.txt',
+          ]))
+        }
+      })
     })
 
+    describe.only(`更新日時で検索: 2019/2/27, 2019/2/28, 2019/3/1の更新日のデータで検証`, () => { // describeのコールバック関数に対し、asyncはサポート外。今後サポートされるかも？的なエラーが出力される
+      const datelist = [new Date('2019-02-27T15:00:00'), new Date('2019-02-28T15:00:00'), new Date('2019-03-01T15:00:00'),].map(date => ({ date: date, name: moment(date).format("YYYYMMDDHHmmss") + '.txt' }))
+      beforeAll(async () => {
+        // 2019/2/27, 2019/2/28, 2019/3/1の更新日
+        let file
+        await Promise.all(datelist.map(async item => {
+          const result = await testControllers.uploadFile({ ...initData.user }, [{ ...filesData.sample_file, name: item.name }], initData.home_dir_id)
+          file = await File.findById(result.res.body[0]._id);
+          file.modified = moment(item.date).format("YYYY-MM-DD HH:mm:ss")
+          await file.save()
+          await testControllers.toggleStar(file._id)
+          return file.modified
+        }))
+      })
+
+      const _getReq = (gt, lt, order) => {
+        const req = {
+          body: {
+            queries: [{
+              meta_info_id: null,
+              search_value_type: 'Date',
+              value_type: 'Date',
+              value: {},
+              name: 'modified',
+              between: true,
+            }],
+            page: 0,  // number
+            sort: 'modified', //column name
+            order: order,  // 'asc' or 'desc'
+            is_display_unvisible: 'false' // 'true' or 'false'
+          },
+        }
+        if (lt) req.body.queries[0].value.lt = lt.toISOString()
+        if (gt) req.body.queries[0].value.gt = gt.toISOString()
+        console.log(req.body.queries[0].value)
+        return req
+      }
+
+      // 2/27 <= date, date <= 3/1, 2/27 <= date 2/28, 2/28 <= date <= 3/1, 2/28 <= date <= 2/28　を検証する
+      it(`条件: 2/27 <= date <= 2/28 `, async () => {
+        const req = _getReq(new Date('2019-02-27T09:00:00'), new Date('2019-02-28T09:00:00'), 'asc')
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+        await file_controller.searchDetail(req, res)
+        if (res.json.mock.calls.length === 0) {
+          expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+        } else {
+          const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+          expect(res_body.status.success).toBe(true)
+          expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+            datelist[0].name,
+            datelist[1].name,
+          ]))
+        }
+      })
+      it(`条件: 2/29 <= date <= 3/01 `, async () => {
+        const req = _getReq(new Date('2019-02-29T09:00:00'), new Date('2019-03-01T09:00:00'), 'asc')
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+        await file_controller.searchDetail(req, res)
+        if (res.json.mock.calls.length === 0) {
+          expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+        } else {
+          const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+          expect(res_body.status.success).toBe(true)
+          expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+            datelist[1].name,
+            datelist[2].name,
+          ]))
+        }
+      })
+      it(`条件: date <= 2/28 `, async () => {
+        const req = _getReq(null, new Date('2019-02-28T09:00:00'), 'asc')
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+        await file_controller.searchDetail(req, res)
+        if (res.json.mock.calls.length === 0) {
+          expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+        } else {
+          const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+          expect(res_body.status.success).toBe(true)
+          expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+            datelist[0].name,
+            datelist[1].name,
+          ]))
+        }
+      })
+      it(`条件: 2/28 <= date `, async () => {
+        const req = _getReq(new Date('2019-02-28T09:00:00'), null, 'asc')
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+        await file_controller.searchDetail(req, res)
+        if (res.json.mock.calls.length === 0) {
+          expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+        } else {
+          const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+          expect(res_body.status.success).toBe(true)
+          expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+            datelist[1].name,
+            datelist[2].name,
+          ]))
+        }
+      })
+      it(`条件: 2/28 <= date <= 2/28 `, async () => {
+        const req = _getReq(new Date('2019-02-28T09:00:00'), new Date('2019-02-28T09:00:00'), 'asc')
+        const error_res_json = jest.fn()
+        const res = { user: { ...default_res.user }, json: jest.fn(), status: jest.fn(() => ({ json: error_res_json })) }
+        await file_controller.searchDetail(req, res)
+        if (res.json.mock.calls.length === 0) {
+          expect(error_res_json.mock.calls[0][0].status.errors).toBe('failed')
+        } else {
+          const res_body = res.json.mock.calls[0][0] //1回目の第一引数
+          expect(res_body.status.success).toBe(true)
+          expect(JSON.stringify(_compact_response(res_body))).toBe(JSON.stringify([
+            datelist[1].name,
+          ]))
+        }
+      })
+    })
   })
 });
 

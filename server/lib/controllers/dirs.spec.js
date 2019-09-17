@@ -25,6 +25,11 @@ describe('lib/controllers/dirs', () => {
   let default_res
   let initData
   let appSetting_InheritParentDirAuth
+  //const getDefaultRes = (user, tenant) => {
+    //const error_res_json = jest.fn()
+    //const res = { user: { ...user, tenant_id: tenant._id, tenant: { ...tenant } }, status: jest.fn(() => ({ json: error_res_json })) }
+    //return { res_success: res, res_error: error_res_json }
+  //}
   const updateAppSetting_InheritParentDirAuth = async value => {
     appSetting_InheritParentDirAuth.enable = value
     await appSetting_InheritParentDirAuth.save()
