@@ -73,14 +73,7 @@ export const index = (req, res, next, export_excel=false, no_limit=false) => {
 
       if(_dir === null) throw new RecordNotFoundException("dir is not found");
 
-      // 権限チェック
-      const file_ids = [
-        ...(yield getAllowedFileIds(res.user._id, constants.PERMISSION_VIEW_LIST )),
-        res.user.tenant.home_dir_id,
-        res.user.tenant.trash_dir_id
-      ];
-
-      if(findIndex(file_ids, mongoose.Types.ObjectId(dir_id)) === -1) throw new PermisstionDeniedException("permission denied");
+      if(!(yield isAllowedFileId(dir_id,res.user._id, constants.PERMISSION_VIEW_LIST))) throw new PermisstionDeniedException("permission denied");
 
       if ( typeof sort === "string" && !mongoose.Types.ObjectId.isValid(sort)  ) throw new ValidationError("sort is empty");
       if ( typeof order === "string" && order !== "asc" && order !== "desc" ) throw new ValidationError("sort is empty");
@@ -235,22 +228,9 @@ export const view = (req, res, next) => {
       }
       if( !mongoose.Types.ObjectId.isValid( file_id ) ) throw new ValidationError("ファイルIDが不正なためファイルの取得に失敗しました");
 
-      const file_ids = yield getAllowedFileIds(
-        res.user._id, constants.PERMISSION_VIEW_DETAIL
-      );
+      const file = yield File.searchFileOne({_id: mongoose.Types.ObjectId(file_id)});
 
-      if (!file_ids.map( f => f.toString() ).includes(file_id)) {
-        throw new PermisstionDeniedException("指定されたファイルが見つかりません");
-      }
-
-      const conditions = {
-        $and:[
-          {_id: mongoose.Types.ObjectId(file_id)},
-          {_id: {$in : file_ids}}
-        ]
-      };
-
-      const file = yield File.searchFileOne(conditions);
+      if(!(yield isAllowedFileId(file_id,res.user._id, constants.PERMISSION_VIEW_DETAIL))) throw new PermisstionDeniedException("指定されたファイルが見つかりません");
 
       if (file === null || file === "" || file === undefined) {
         throw new RecordNotFoundException("指定されたファイルが見つかりません");
@@ -2940,3 +2920,21 @@ export const extractFileActions = (authorities, user) => {
 
   return user_actions.concat(group_actuions);
 };
+
+export const isAllowedFileId = (file_id,user_id, permission) => {
+  return co(function*() {
+    const action = yield Action.findOne({ name:permission });
+    const role = (yield RoleFile.find({ actions:{$all : [action._id] } },{'_id':1})).map( role => mongoose.Types.ObjectId(role._id) );
+    const user = yield User.findById(user_id);
+    const authorities = yield AuthorityFile.find(
+      {
+        $or : [
+          { users: mongoose.Types.ObjectId(user_id) },
+          { groups: {$in: user.groups } }],
+        role_files: {$in: role },
+        files: mongoose.Types.ObjectId(file_id)
+      });
+    const file_ids = authorities.filter( authority => (authority.files !== undefined)).map( authority => authority.files );
+    return new Promise((resolve, reject) => resolve(file_ids) );
+  });
+}
