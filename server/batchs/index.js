@@ -43,6 +43,9 @@ mongoose.connect(`${url}/${db_name}`, {useMongoClient: true}).then( () => {
   case "initElasticsearch":
     tasks.initElasticsearchTask();
     break;
+  case "reCreateElasticCache":
+    tasks.reCreateElasticCacheTask();
+    break;
   case "moveUnvisibleFiles":
     tasks.moveInvisibleFilesTask();
     break;

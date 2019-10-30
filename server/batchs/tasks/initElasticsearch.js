@@ -13,6 +13,10 @@ import Tenant from "../../lib/models/Tenant";
 import DisplayItem from "../../lib/models/DisplayItem";
 import MetaInfo from "../../lib/models/MetaInfo";
 import Action from "../../lib/models/Action";
+import File from "../../lib/models/File";
+import Dir from "../../lib/models/Dir";
+
+import * as constants from "../../lib/configs/constants";
 
 const task = () => {
   co(function* () {
@@ -135,5 +139,51 @@ const task = () => {
 
   });
 };
+
+/**
+ * init後に行う
+ * @param {*} tenant_id
+ */
+export const reCreateElasticCache = () => {
+  co(function* (){
+    try {
+
+      if (! process.argv[3]) throw new Error("引数にテナント名を指定する必要があります");
+
+      const tenant_name = process.argv[3];
+      const tenant = yield Tenant.findOne({"name": tenant_name});
+      if (tenant === null) throw new Error(`指定されたテナントは存在しません ${tenant_name}`);
+      const folder_ids = (yield Dir.find({
+          ancestor: tenant.home_dir_id,
+          descendant: { $nin: [tenant.trash_dir_id ] } //trashを含まない
+        }))
+        .map( folder => folder.descendant ) // フォルダのidリストを取得
+
+      console.log('インデックス作成されるフォルダリスト：')
+      console.log(folder_ids)
+      for(let i = 0 ; i< folder_ids.length; i++){
+        const folder_id = folder_ids[i];
+
+        const folder_count = yield File.find({_id: folder_id, is_display: true}).count();
+        if(folder_count > 0) { // is_display:trueの場合のみ、フォルダを検索対象にする（Topは対象外になる）
+          const folder = yield File.searchFileOne({_id: folder_id});
+          const result = yield esClient.createIndex(tenant._id.toString(), [folder]);
+        }
+        const file_ids = (yield File.find({dir_id: folder_id, is_dir: false, is_display: true})).map( file => file._id );
+
+        for(let i= 0; i < file_ids.length; i += constants.FILE_LIMITS_PER_PAGE ){
+          const ids = file_ids.slice(i, i + ( constants.FILE_LIMITS_PER_PAGE - 1 ) );
+          const files = yield File.searchFiles({ _id: { $in: ids } }, 0, constants.FILE_LIMITS_PER_PAGE, { _id: "asc" });
+          yield esClient.createIndex(tenant._id.toString(), files);
+        }
+      }
+
+    } catch (error) {
+      console.log(error);
+    } finally {
+      process.exit();
+    }
+  });
+}
 
 export default task;
