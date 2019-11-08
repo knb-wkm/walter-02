@@ -59,7 +59,7 @@ esClient.createIndex = co.wrap(
           is_trash: file.is_trash,
           is_crypted: file.is_crypted,
           is_deleted: file.is_deleted,
-          // modified: file.modified,
+          modified: file.modified,
           preview_id: file.preview_id,
           sort_target: file.sort_target,
           unvisible: file.unvisible
