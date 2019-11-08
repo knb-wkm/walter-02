@@ -1,7 +1,7 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 import moment from "moment";
-import { uniq } from "lodash";
+import { uniq, get } from "lodash";
 
 // material
 import Checkbox from 'material-ui/Checkbox';
@@ -41,11 +41,17 @@ class File extends Component {
   renderCell = (header, file, cellStyle, idx) => {
     let body;
 
-    if (header.meta_info_id === null) {
+    if (get(header, "meta_info_id") === undefined) {
+      
       if (header.name === "authorities") {
         body = this.renderMember();
-      } else {
-        body = file[header.name];
+      }
+      else {
+        if (header.value_type === "Date") {
+          body = moment(file[header.name]).format("YYYY-MM-DD HH:mm");
+        } else {
+          body = file[header.name];
+        }
       }
     } else {
       const meta = file.meta_infos.filter( meta => (

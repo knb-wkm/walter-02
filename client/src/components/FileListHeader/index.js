@@ -5,6 +5,7 @@ import PropTypes from "prop-types";
 import Checkbox from 'material-ui/Checkbox';
 import FlatButton from "material-ui/FlatButton";
 import ContentSort from "material-ui/svg-icons/content/sort";
+import _ from "lodash";
 
 const FileListHeader = ({
   idx,
@@ -21,7 +22,7 @@ const FileListHeader = ({
     if (fileSortTarget.sorted === header._id || fileSortTarget.sorted === header.meta_info_id ) {
       actions.toggleSortTarget();
     } else {
-      actions.setSortTarget( header.meta_info_id === null ? header._id : header.meta_info_id );
+      actions.setSortTarget( _.get(header, "meta_info_id") === undefined ? header.name : header.meta_info_id );
     }
   };
 
@@ -61,7 +62,10 @@ const FileListHeader = ({
   else {
     let sortIcon;
 
-    if ( header._id === fileSortTarget.sorted || fileSortTarget.sorted === header.meta_info_id  ) {
+    if ( header._id === fileSortTarget.sorted
+         || fileSortTarget.sorted === header.meta_info_id
+         || header.name === fileSortTarget.sorted
+       ) {
       if (fileSortTarget.desc) {
         sortIcon = <ContentSort />;
       }

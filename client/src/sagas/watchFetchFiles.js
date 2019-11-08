@@ -9,6 +9,7 @@ import { isDisplayUnvisibleSetting } from "./watchToggleDisplayUnvisibleFiles";
 import * as actions from "../actions/files";
 import * as commons from "../actions/commons";
 import errorParser from "../helper/errorParser";
+import _ from "lodash";
 
 export function* watchFetchFiles() {
   while (true) {
@@ -31,11 +32,14 @@ export function* watchFetchFiles() {
           defaultSort = defaultSort.data.body.filter( item => item.default_sort );
 
           defaultSort = defaultSort.length > 0 ? defaultSort[0] : null;
-          
+
+          const defaultSortTarget = _.get(defaultSort,"meta_info_id") === undefined ?
+                defaultSort.name : defaultSort.meta_info_id;
+
           [ files, dirs ] = yield all([
-            call(api.fetchFiles, dir_id, page, defaultSort.meta_info_id, defaultSort.default_sort.desc, isDisplayUnvisible),
+            call(api.fetchFiles, dir_id, page, defaultSortTarget, defaultSort.default_sort.desc, isDisplayUnvisible),
             call(api.fetchDirs, dir_id),
-            put(actions.setSortTarget(defaultSort.meta_info_id))
+            put(actions.setSortTarget(defaultSortTarget))
           ]);
         }
         else {
