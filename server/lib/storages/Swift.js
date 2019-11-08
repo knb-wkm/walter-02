@@ -56,28 +56,9 @@ class Swift {
 
   downloadFile(container_name, file) {
     return new Promise( (resolve, reject) => {
-      const stream = fs.createWriteStream("/tmp/stream.tmp");
-
-      if(file.is_crypted){
-        const decipher = crypto.createDecipher("aes-256-cbc", constants.CRYPTO_PASSWORD);
-        this.client.download({
-          container: container_name,
-          remote: file._id.toString()
-        }, (err, result) => {
-          if (err) reject(err);
-        }).pipe(decipher).pipe(stream).on("finish", () => resolve(stream) );
-      }else{
-        this.client.download({
-          container: container_name,
-          remote: file._id.toString()
-        }, (err, result) => {
-          if (err) reject(err);
-        }).pipe(stream).on("finish", () => resolve(stream) );
-      }
-    }).then( writeStream => {
-      return new Promise( (resolve, reject) => {
-        resolve(fs.createReadStream(writeStream.path));
-      });
+      const decipher = crypto.createDecipher("aes-256-cbc", constants.CRYPTO_PASSWORD);
+      const stream = this.client.download({container: container_name, remote: file._id.toString() });
+      file.is_cripted ? resolve(stream.pipe(decipher)) : resolve(stream);
     });
   }
 
