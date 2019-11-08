@@ -65,7 +65,13 @@ const task = () => {
         is_trash: { type:"boolean" },
         is_crypted: { type:"boolean", index: false },
         is_deleted: { type:"boolean" },
-        modified: { type:"date", index: false },
+        modified: {
+          type:"date",
+          index: true,
+          fields: {
+            raw: { type: "keyword" }
+          }
+        },
         preview_id: { type:"text", index: false },
         authorities: { type:"nested" },
         dirs: { type:"nested" },
