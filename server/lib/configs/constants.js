@@ -122,7 +122,7 @@ export const LIBRE_OFFICE_PATH = () => {
     librePath = "/usr/bin/soffice";
     break;
   default:
-    librePath = "/Applications/LibreOffice.app/Contents/MacOS/soffice";
+    librePath = "/usr/bin/soffice";
     break;
   }
 
