@@ -23,7 +23,8 @@ import {
   first,
   sortBy,
   max,
-  indexOf
+  indexOf,
+  get
 } from "lodash";
 
 // etc
@@ -75,7 +76,7 @@ export const index = (req, res, next, export_excel=false, no_limit=false) => {
 
       if(!(yield isAllowedFileId(dir_id,res.user._id, constants.PERMISSION_VIEW_LIST))) throw new PermisstionDeniedException("permission denied");
 
-      if ( typeof sort === "string" && !mongoose.Types.ObjectId.isValid(sort)  ) throw new ValidationError("sort is empty");
+      // if ( typeof sort === "string" && !mongoose.Types.ObjectId.isValid(sort)  ) throw new ValidationError("sort is empty");
       if ( typeof order === "string" && order !== "asc" && order !== "desc" ) throw new ValidationError("sort is empty");
       const sortOption = yield createSortOption(sort, order);
 
@@ -90,31 +91,62 @@ export const index = (req, res, next, export_excel=false, no_limit=false) => {
       const isDisplayUnvisibleCondition = isDisplayUnvisible
             ? {} : { "match": { "file.unvisible": false } };
 
+      // user_id or group_idで権限があるファイルを取得する
+      let authorityConditions = [
+        {
+          match: {
+            [`file.actions.${action_id}`]: {
+              query: res.user._id
+            }
+          }
+        }
+      ];
+
+      if(res.user.groups.length > 0) {
+        authorityConditions = authorityConditions.concat(
+          res.user.groups.map( group_id => {
+            return {
+              match: {
+                [`file.actions.${action_id}`]: {
+                  query: group_id
+                }
+              }
+            };
+          })
+        );
+      }
+
       const esQuery = {
         index: tenant_id.toString(),
         type: "files",
         sort: [ "file.is_dir:desc", (sort === undefined) ? "_score" : `file.${sort}.raw:${order}`],
         body:
           {
-            "query" :{
-              "bool":{
-                "must": [
+            query: {
+              bool: {
+                must: [
                   {
-                    "match": {"file.dir_id":{ "query":dir_id, "operator": "and" }
-                  }},{
-                    "match" : {
-                    [`file.actions.${action_id}`]:
-                      {
-                        "query": res.user._id,　  // 一覧の表示権限のあるユーザを対象
-                        "operator": "and"         // operator の default は or なので and のする
+                    match: {
+                      "file.dir_id":{
+                        "query":dir_id, "operator": "and"
                       }
-                  }},{
-                    "match" : {
+                    }
+                  },
+                  {
+                    match: {
                       "file.is_display": true
-                  }},{
-                    "match" : {
-                    "file.is_deleted": false
-                  }},
+                    }
+                  },
+                  {
+                    match: {
+                      "file.is_deleted": false
+                    }
+                  },
+                  {
+                    bool: {
+                      should: authorityConditions
+                    }
+                  },
                   isDisplayUnvisibleCondition
                 ]
               }
@@ -123,21 +155,37 @@ export const index = (req, res, next, export_excel=false, no_limit=false) => {
       };
 
       const offset = page * constants.FILE_LIMITS_PER_PAGE;
+      let esResult;
+      let esCount;
+      const query_for_count = {...esQuery};
+      if (query_for_count.sort) {
+        delete query_for_count.sort;
+      }
+      delete query_for_count.body.highlight;
+      esCount = yield esClient.count(query_for_count);
+
+      console.log(util.inspect(esQuery, false, null));
       if(!export_excel){
         esQuery["from"] = offset;
         esQuery["size"] = parseInt( offset ) + 30;
+        esResult = yield esClient.search(esQuery);
       }else{
-        esQuery["from"] = 0;
-        esQuery["size"] = 0;
+        // elasticsearch.jsのバージョンによってはsearchAll methodが存在しない
+        if (get(esClient, "searchAll")) {
+          esResult = yield esClient.searchAll(esQuery);
+        } else {
+          // esQuery["from"] = 0;
+          // esQuery["size"] = 0;
+          esResult = yield esClient.search(esQuery);
+        }
       }
 
-      let esResult = yield esClient.search(esQuery);
-      const { total } = esResult.hits;
-
-      if(export_excel){
-        // elasticsearchが無制限にレコードを取得できないので一度totalを取得してから再検索する
-        esQuery["size"] = total;
-        esResult = yield esClient.search(esQuery);
+      // elasticsearch.jsのバージョンによってObjectの型が異なる
+      let total;
+      if (get(esCount, "body.count")) {
+        total = esCount.body.count;
+      } else {
+        total = esCount.count;
       }
 
       const esResultIds = esResult.hits.hits
@@ -155,7 +203,12 @@ export const index = (req, res, next, export_excel=false, no_limit=false) => {
 
       const limit = ( export_excel && total !== 0 ) ? total : constants.FILE_LIMITS_PER_PAGE;
 
-      let files = yield File.searchFiles(conditions, 0, limit, sortOption, mongoose.Types.ObjectId(sort));
+      let files;
+      if (mongoose.Types.ObjectId.isValid(sort)) {
+        files = yield File.searchFiles(conditions, 0, limit, sortOption, mongoose.Types.ObjectId(sort));
+      } else {
+        files = yield File.searchFiles(conditions, 0, limit, sortOption);
+      }
 
       files = files.map( file => {
         file.actions = extractFileActions(file.authorities, res.user);
@@ -338,6 +391,31 @@ export const search = (req, res, next, export_excel=false) => {
       const isDisplayUnvisibleCondition = isDisplayUnvisible
             ? {} : { "match": { "file.unvisible": false } };
 
+      // user_id or group_idで権限があるファイルを取得する
+      let authorityConditions = [
+        {
+          match: {
+            [`file.actions.${action_id}`]: {
+              query: res.user._id
+            }
+          }
+        }
+      ];
+
+      if(res.user.groups.length > 0) {
+        authorityConditions = authorityConditions.concat(
+          res.user.groups.map( group_id => {
+            return {
+              match: {
+                [`file.actions.${action_id}`]: {
+                  query: group_id
+                }
+              }
+            };
+          })
+        );
+      }
+
       // 閲覧できるフォルダの一覧を取得する
       const esQueryDir = {
         index: tenant_id.toString(),
@@ -348,23 +426,24 @@ export const search = (req, res, next, export_excel=false) => {
               "must_not": [{
                 "match": {"file.dir_id":{ "query":trash_dir_id.toString(), "operator": "and" }}   // ゴミ箱内のファイルは対象外
               }],
-              "must": [{
-                "match" : {
-                  [`file.actions.${action_id}`]:
-                    {
-                      "query": res.user._id,　  // 一覧の表示権限のあるユーザを対象
-                      "operator": "and"         // operator の default は or なので and のする
-                    }
-                }},{
+              "must": [
+                {
                   "match" : {
                     "file.is_dir": true
                   }
-                }, isDisplayUnvisibleCondition
+                },
+                {
+                  bool: {
+                    should: authorityConditions
+                  }
+                },
+                isDisplayUnvisibleCondition
               ]
             }
           }
         }
       };
+
       let esResultDir = yield esClient.search(esQueryDir);
 
       // 取得した一覧とTopが閲覧可能なフォルダとなる
@@ -415,50 +494,70 @@ export const search = (req, res, next, export_excel=false) => {
                     "default_operator": "AND",
                     "fields": searchFields
                     }
-                  },{
-                  "match" : {
-                    [`file.actions.${action_id}`]:
-                      {
-                        "query": res.user._id,　  // 一覧の表示権限のあるユーザを対象
-                        "operator": "and"         // operator の default は or なので and のする
-                      }
-                  }},{
+                  },
+                  {
                     "match" : {
-                    "file.is_display": true
-                  }},{
+                      "file.is_display": true
+                    }
+                  },
+                  {
                     "match" : {
-                    "file.is_deleted": false
-                  }},{
+                      "file.is_deleted": false
+                    }
+                  },
+                  {
                     "match" : {
-                    "file.is_trash": false
-                    }},
+                      "file.is_trash": false
+                    }
+                  },
                   isDisplayUnvisibleCondition,
                   {
                     "terms" : {
                       "file.dir_id": authorizedDirIds
-                  }}
+                    }
+                  },
+                  {
+                    bool: {
+                      should: authorityConditions
+                    }
+                  }
                 ]
               }
+            }
           }
-        }
       };
 
       const offset = _page * constants.FILE_LIMITS_PER_PAGE;
+      let esResult;
+      let esCount;
+      const query_for_count = {...esQuery};
+
+      if (query_for_count.sort) {
+        delete query_for_count.sort;
+      }
+      delete query_for_count.body.highlight;
+      esCount = yield esClient.count(query_for_count);
+
       if(!export_excel){
         esQuery["from"] = offset;
         esQuery["size"] = parseInt( offset ) + 30;
-      }else{
-        esQuery["from"] = 0;
-        esQuery["size"] = 0;
-      }
-
-      let esResult = yield esClient.search(esQuery);
-      const { total } = esResult.hits;
-
-      if(export_excel){
-        // elasticsearchが無制限にレコードを取得できないので一度totalを取得してから再検索する
-        esQuery["size"] = total;
         esResult = yield esClient.search(esQuery);
+      }else{
+        // elasticsearch.jsのバージョンによってはsearchAll methodが存在しない
+        if (get(esClient, "searchAll")) {
+          esResult = yield esClient.searchAll(esQuery);
+        } else {
+          // esQuery["from"] = 0;
+          // esQuery["size"] = 0;
+          esResult = yield esClient.search(esQuery);
+        }
+      }
+      // elasticsearch.jsのバージョンによってObjectの型が異なる
+      let total;
+      if (get(esCount, "body.count")) {
+        total = esCount.body.count;
+      } else {
+        total = esCount.count;
       }
 
       const esResultIds = esResult.hits.hits
@@ -482,7 +581,13 @@ export const search = (req, res, next, export_excel=false) => {
 
       const _sort = yield createSortOption(sort, order);
 
-      let files = yield File.searchFiles(conditions, 0, limit, _sort, mongoose.Types.ObjectId(sort));
+      let files;
+      if (mongoose.Types.ObjectId.isValid(sort)) {
+        files = yield File.searchFiles(conditions, 0, limit, _sort, mongoose.Types.ObjectId(sort));
+      } else {
+        files = yield File.searchFiles(conditions, 0, limit, _sort);
+      }
+
       files = files.map( file => {
         const route = file.dirs
               .filter( dir => dir.ancestor.is_display )
@@ -492,17 +597,7 @@ export const search = (req, res, next, export_excel=false) => {
           ? route.reverse().join("/")
           : "";
 
-        files = files.map( file => {
-
-          file.actions = chain(file.authorities)
-            .filter( auth => auth.users._id.toString() === res.user._id.toString() )
-            .map( auth => auth.actions )
-            .flattenDeep()
-            .uniq();
-
-          return file;
-        });
-
+        file.actions = extractFileActions(file.authorities, res.user);
         return file;
       });
 
@@ -652,6 +747,33 @@ export const searchDetail = (req, res, next, export_excel=false) => {
       const isDisplayUnvisibleCondition = isDisplayUnvisible
             ? {} : { "match": { "file.unvisible": false } };
 
+      const action_id = (yield Action.findOne({name:constants.PERMISSION_VIEW_LIST}))._id;  // 一覧表示のアクションID
+
+      // user_id or group_idで権限があるファイルを取得する
+      let authorityConditions = [
+        {
+          match: {
+            [`file.actions.${action_id}`]: {
+              query: res.user._id
+            }
+          }
+        }
+      ];
+
+      if(res.user.groups.length > 0) {
+        authorityConditions = authorityConditions.concat(
+          res.user.groups.map( group_id => {
+            return {
+              match: {
+                [`file.actions.${action_id}`]: {
+                  query: group_id
+                }
+              }
+            };
+          })
+        );
+      }
+      
       const esQueryDir = {
         index: tenant_id.toString(),
         type: "files",
@@ -661,18 +783,24 @@ export const searchDetail = (req, res, next, export_excel=false) => {
               must_not: [{
                 match: {"file.dir_id": { query: trash_dir_id.toString(), operator: "and" }}
               }],
-              must: [{
-                match: {
-                  [`file.actions.${action._id}`]: {
-                    query: res.user._id,
-                    operator: "and"
+              must: [
+                {
+                  match: {
+                    "file.is_dir": true
                   }
-                }
-              }, {
-                match: {
-                  "file.is_dir": true
-                }
-              }, isDisplayUnvisibleCondition]
+                },
+                {
+                  match: {
+                    "file.is_deleted": false
+                  }
+                },
+                {
+                  bool: {
+                    should: authorityConditions
+                  }
+                },
+                isDisplayUnvisibleCondition
+              ]
             }
           }
         }
@@ -689,13 +817,6 @@ export const searchDetail = (req, res, next, export_excel=false) => {
       let esQueryMustsBase = [
         {
           match: {
-            [`file.actions.${action._id}`]: {
-              query: res.user._id,
-              operator: "and"
-            }
-          }
-        }, {
-          match: {
             "file.is_display": true
           }
         }, {
@@ -709,6 +830,11 @@ export const searchDetail = (req, res, next, export_excel=false) => {
         }, isDisplayUnvisibleCondition, {
           terms: {
             "file.dir_id": authorizedDirIds
+          }
+        },
+        {
+          bool: {
+            should: authorityConditions
           }
         }
       ];
@@ -833,21 +959,36 @@ export const searchDetail = (req, res, next, export_excel=false) => {
       };
 
       const offset = _page * constants.FILE_LIMITS_PER_PAGE;
+      let esResult;
+      let esCount;
+      const query_for_count = {...esQuery};
 
+      if (query_for_count.sort) {
+        delete query_for_count.sort;
+      }
+      esCount = yield esClient.count(query_for_count);
+      
       if (! export_excel) {
         esQuery["from"] = offset;
         esQuery["size"] = parseInt( offset ) + 30;
+        esResult = yield esClient.search(esQuery);
       } else {
-        esQuery["from"] = 0;
-        esQuery["size"] = 0;
+        // elasticsearch.jsのバージョンによってはsearchAll methodが存在しない
+        if (get(esClient, "searchAll")) {
+          esResult = yield esClient.searchAll(esQuery);
+        } else {
+          // esQuery["from"] = 0;
+          // esQuery["size"] = 0;
+          esResult = yield esClient.search(esQuery);
+        }
       }
 
-      let esResult = yield esClient.search(esQuery);
-      const { total } = esResult.hits;
-
-      if(export_excel){
-        esQuery["size"] = total;
-        esResult = yield esClient.search(esQuery);
+      // elasticsearch.jsのバージョンによってObjectの型が異なる
+      let total;
+      if (get(esCount, "body.count")) {
+        total = esCount.body.count;
+      } else {
+        total = esCount.count;
       }
 
       const esResultIds = esResult.hits.hits
@@ -866,12 +1007,19 @@ export const searchDetail = (req, res, next, export_excel=false) => {
 
       const limit = ( export_excel && total !== 0 ) ? total : constants.FILE_LIMITS_PER_PAGE;
 
-      if ( typeof sort === "string" && !mongoose.Types.ObjectId.isValid(sort)  ) throw new ValidationError("sort is empty");
+      // if ( typeof sort === "string" && !mongoose.Types.ObjectId.isValid(sort)  ) throw new ValidationError("sort is empty");
       if ( typeof order === "string" && order !== "asc" && order !== "desc" ) throw new ValidationError("sort is empty");
 
       const _sort = yield createSortOption(sort, order);
 
-      let files = yield File.searchFiles(conditions, 0, limit, _sort, mongoose.Types.ObjectId(sort));
+      let files;
+
+      if (mongoose.Types.ObjectId.isValid(sort)) {
+        files = yield File.searchFiles(conditions, 0, limit, _sort, mongoose.Types.ObjectId(sort));
+      } else {
+        files = yield File.searchFiles(conditions, 0, limit, _sort);
+      }
+
       files = files.map( file => {
         const route = file.dirs
               .filter( dir => dir.ancestor.is_display )
@@ -881,17 +1029,7 @@ export const searchDetail = (req, res, next, export_excel=false) => {
           ? route.reverse().join("/")
           : "";
 
-        files = files.map( file => {
-
-          file.actions = chain(file.authorities)
-            .filter( auth => auth.users._id.toString() === res.user._id.toString() )
-            .map( auth => auth.actions )
-            .flattenDeep()
-            .uniq();
-
-          return file;
-        });
-
+        file.actions = extractFileActions(file.authorities, res.user);
         return file;
       });
 
@@ -2800,31 +2938,38 @@ const createSortOption = co.wrap( function* (_sort=null, _order=null) {
     sort["id"] = order;
 
   } else {
-    const conditions = { _id: mongoose.Types.ObjectId(_sort) };
-    const metaInfos = (yield MetaInfo.find(conditions)).map( meta => {
-      meta = meta.toObject();
-      meta.meta_info_id = meta._id;
-      return meta;
-    });
+    const isMetaInfo = mongoose.Types.ObjectId.isValid(_sort);
+    let conditions, metaInfos;
 
-    const displayItems = (yield DisplayItem.find({
-      ...conditions,
-      name: { $nin: ["file_checkbox", "action"] }
-    })).map(items => items.toObject()) ;
+    if (isMetaInfo) {
+      conditions = { _id: mongoose.Types.ObjectId(_sort) };
+      metaInfos = (yield MetaInfo.find(conditions)).map( meta => {
+        meta = meta.toObject();
+        meta.meta_info_id = meta._id;
+        return meta;
+      });
 
-    const item = metaInfos.concat(displayItems)[0];
-    if (item.meta_info_id === null) {
-      // メタ情報以外でのソート
-      sort[item.name] = order;
-    } else if(item.meta_info_id !== null) {
-      // メタ情報でのソート
-      sort = {
-        "is_dir":"desc",
-        "sort_target": order
-      };
+      const displayItems = (yield DisplayItem.find({
+        ...conditions,
+        name: { $nin: ["file_checkbox", "action"] }
+      })).map(items => items.toObject()) ;
+
+      const item = metaInfos.concat(displayItems)[0];
+      if (item.meta_info_id === null) {
+        // メタ情報以外でのソート
+        sort[item.name] = order;
+      } else if(item.meta_info_id !== null) {
+        // メタ情報でのソート
+        sort = {
+          "is_dir":"desc",
+          "sort_target": order
+        };
+      } else {
+        // @fixme
+        sort["id"] = order;
+      }
     } else {
-      // @fixme
-      sort["id"] = order;
+      sort[_sort] = order;
     }
   }
   sort["name"] = order;
