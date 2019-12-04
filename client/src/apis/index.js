@@ -505,7 +505,7 @@ export class API {
     const config = {
       responseType: "arraybuffer",
     };
-    const data = { ...params, page, sort: sorted, order, is_display_unvisible: isDisplayUnvisible };
+    const data = { queries: params, page, sort: sorted, order, is_display_unvisible: isDisplayUnvisible };
 
     return this.client.post(`/api/v1/excels/search_detail`, data, config);
   };

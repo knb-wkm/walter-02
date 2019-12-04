@@ -42,6 +42,5 @@ export const createFileName = (file,format) => {
     }
   });
 
-
   return replaced === rep["{extension}"] ? file.name : replaced;　// 拡張子以外未定義の場合は元のファイル名を返す
 };

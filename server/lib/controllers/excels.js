@@ -31,11 +31,9 @@ export const index = (req, res, next) => {
 
       const roles = yield RoleFile.find({ tenant_id: res.user.tenant_id });
 
-      const readStream = yield exportExcelBook(displayItems,tags,roles,files);
-
-      fs.createReadStream(readStream.path)
-      .on("data", data => res.write(data) )
-      .on("end", () => res.end() );
+      const workbook = yield exportExcelBook(displayItems,tags,roles,files);
+      res.write(workbook);
+      res.end();
     }
     catch (e) {
       // TODO: エラー処理を追加する
@@ -69,10 +67,9 @@ export const search = (req, res, next) => {
 
       const roles = yield RoleFile.find({ tenant_id: res.user.tenant_id });
 
-      const readStream = yield exportExcelBook(displayItems,tags,roles,files);
-      fs.createReadStream(readStream.path)
-      .on("data", data => res.write(data) )
-      .on("end", () => res.end() );
+      const workbook = yield exportExcelBook(displayItems,tags,roles,files);
+      res.write(workbook);
+      res.end();
     }
     catch (e) {
       // TODO: エラー処理を追加する
@@ -106,10 +103,9 @@ export const searchDetail = (req, res, next) => {
 
       const roles = yield RoleFile.find({ tenant_id: res.user.tenant_id });
 
-      const readStream = yield exportExcelBook(displayItems,tags,roles,files);
-      fs.createReadStream(readStream.path)
-      .on("data", data => res.write(data) )
-      .on("end", () => res.end() );
+      const workbook = yield exportExcelBook(displayItems,tags,roles,files);
+      res.write(workbook);
+      res.end();
     }
     catch (e) {
       // TODO: エラー処理を追加する
@@ -258,10 +254,5 @@ const exportExcelBook = co.wrap( function*(displayItems, tags,roles, files){
 
   }
 
-
-  //出力
-  const stream = fs.createWriteStream("/tmp/stream.tmp");
-  yield workbook.xlsx.write(stream);
-
-  return stream;
+  return workbook.xlsx.writeBuffer();
 });

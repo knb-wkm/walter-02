@@ -54,6 +54,7 @@ import AuthorityFile from "../models/AuthorityFile";
 import Action from "../models/Action";
 import FileMetaInfo from "../models/FileMetaInfo";
 import DisplayItem from "../models/DisplayItem";
+import AppSetting from '../models/AppSetting';
 import { Swift } from "../storages/Swift";
 
 import { moveDir } from "./dirs";
@@ -164,7 +165,6 @@ export const index = (req, res, next, export_excel=false, no_limit=false) => {
       delete query_for_count.body.highlight;
       esCount = yield esClient.count(query_for_count);
 
-      console.log(util.inspect(esQuery, false, null));
       if(!export_excel){
         esQuery["from"] = offset;
         esQuery["size"] = parseInt( offset ) + 30;
@@ -174,8 +174,15 @@ export const index = (req, res, next, export_excel=false, no_limit=false) => {
         if (get(esClient, "searchAll")) {
           esResult = yield esClient.searchAll(esQuery);
         } else {
-          // esQuery["from"] = 0;
-          // esQuery["size"] = 0;
+          let _total; 
+          if (get(esCount, "body.count")) {
+            _total = esCount.body.count;
+          } else {
+            _total = esCount.count;
+          }
+
+          esQuery["from"] = 0;
+          esQuery["size"] = parseInt(_total);
           esResult = yield esClient.search(esQuery);
         }
       }
@@ -547,8 +554,15 @@ export const search = (req, res, next, export_excel=false) => {
         if (get(esClient, "searchAll")) {
           esResult = yield esClient.searchAll(esQuery);
         } else {
-          // esQuery["from"] = 0;
-          // esQuery["size"] = 0;
+          let _total; 
+          if (get(esCount, "body.count")) {
+            _total = esCount.body.count;
+          } else {
+            _total = esCount.count;
+          }
+
+          esQuery["from"] = 0;
+          esQuery["size"] = parseInt(_total);
           esResult = yield esClient.search(esQuery);
         }
       }
@@ -576,7 +590,7 @@ export const search = (req, res, next, export_excel=false) => {
 
       const limit = ( export_excel && total !== 0 ) ? total : constants.FILE_LIMITS_PER_PAGE;
 
-      if ( typeof sort === "string" && !mongoose.Types.ObjectId.isValid(sort)  ) throw new ValidationError("sort is empty");
+      // if ( typeof sort === "string" && !mongoose.Types.ObjectId.isValid(sort)  ) throw new ValidationError("sort is empty");
       if ( typeof order === "string" && order !== "asc" && order !== "desc" ) throw new ValidationError("sort is empty");
 
       const _sort = yield createSortOption(sort, order);
@@ -729,7 +743,7 @@ export const searchItems = (req, res, next) => {
 };
 
 export const searchDetail = (req, res, next, export_excel=false) => {
-  co(function* () {
+  return co(function* () {
     try {
       const { queries, page, sort, order, is_display_unvisible } = req.body;
 
@@ -977,8 +991,15 @@ export const searchDetail = (req, res, next, export_excel=false) => {
         if (get(esClient, "searchAll")) {
           esResult = yield esClient.searchAll(esQuery);
         } else {
-          // esQuery["from"] = 0;
-          // esQuery["size"] = 0;
+          let _total; 
+          if (get(esCount, "body.count")) {
+            _total = esCount.body.count;
+          } else {
+            _total = esCount.count;
+          }
+
+          esQuery["from"] = 0;
+          esQuery["size"] = parseInt(_total);
           esResult = yield esClient.search(esQuery);
         }
       }
@@ -1159,10 +1180,16 @@ export const move = (req, res, next) => {
 
       if (user === null) throw "user is empty";
 
-      const isPermittedFile = yield checkFilePermission(file_id, user._id, constants.PERMISSION_MOVE);
-      const isPermittedDir = yield checkFilePermission(dir_id, user._id, constants.PERMISSION_UPLOAD);
+      const isPermittedFileMove = yield checkFilePermission(file_id, user._id, constants.PERMISSION_MOVE);
+      const isPermittedDirMove = yield checkFilePermission(dir_id, user._id, constants.PERMISSION_MOVE);
+      const isPermittedFileRevert = yield checkFilePermission(file_id, user._id, constants.PERMISSION_REVERT);
+      const isPermittedDirRevert = yield checkFilePermission(dir_id, user._id, constants.PERMISSION_REVERT);
 
-      if( !(isPermittedFile && isPermittedDir ) ) throw "permission denied";
+      if( !(isPermittedFileMove && isPermittedDirMove) ) {
+        if( !(isPermittedFileRevert && isPermittedDirRevert) ) {
+          throw "permission denied";
+        }
+      }
 
       const [ file, dir ] = yield [ File.findById(file_id), File.findById(dir_id) ];
 
@@ -1450,6 +1477,7 @@ export const upload = (req, res, next) => {
           const _meta = metainfos.filter( m => m._id.toString() === meta._id )[0];
 
           if (_meta.value_type === "Date") {
+
             return ! moment(meta.value).isValid();
           }
           else {
@@ -1689,6 +1717,16 @@ export const upload = (req, res, next) => {
         ));
       });
 
+      // ファイル上書き設定がapp_settingにて有効になっていれば
+      // dir_idかつfile.nameが一致しているファイルを上書きする
+      const overrideSetting = yield AppSetting.findOne({
+        tenant_id: res.user.tenant_id.toString(),
+        name: constants.ALLOW_FILE_OVERRIDE,
+        enable: true
+      });
+
+      const isOverrideMode = overrideSetting !== null
+
       // mongoへの保存開始
       let changedFiles = [];
 
@@ -1697,7 +1735,25 @@ export const upload = (req, res, next) => {
         // ファイル本体(files)の保存
         if (! fileModels[i]) continue;
 
-        const saveFileModel = yield fileModels[i].save();
+        let saveFileModel;
+        
+        // 上書き設定が有効であれば
+        if (isOverrideMode === true) {
+          const removeFile = yield File.findOne({
+            name: fileModels[i].name,
+            dir_id: mongoose.Types.ObjectId(fileModels[i].dir_id),
+            is_deleted: false
+          })
+
+          if (removeFile !== null) {
+            removeFile.is_deleted = true;
+            yield removeFile.save();
+            const updatedFile = yield File.searchFileOne({_id: mongoose.Types.ObjectId(removeFile._id)})
+            yield esClient.createIndex(res.user.tenant_id, [updatedFile])
+          }
+        }
+
+        saveFileModel = yield fileModels[i].save();
         changedFiles.push(saveFileModel);
 
         if (! saveFileModel) {

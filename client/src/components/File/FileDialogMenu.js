@@ -141,7 +141,7 @@ const FileDialogMenu = ({
   menuItems = trashDirId === file.dir_id
     ? menuItems.concat(
       {
-        name: constants.PERMISSION_RESTORE,
+        name: constants.PERMISSION_REVERT,
         component: idx => (
           <MenuItem
             key={idx}

@@ -38,7 +38,7 @@ import * as FileActions from "../actions/files";
 
 import { FILE_DETAIL } from "../constants";
 
-import { find, findIndex, uniq, chain, value } from "lodash";
+import { find, findIndex, uniq, chain, value, get } from "lodash";
 
 const styles = {
   fileImageWrapper: {
@@ -88,6 +88,7 @@ class FileDetailContainer extends Component {
     this.props.actions.requestFetchFilePreview(this.props.match.params.id);
     this.props.actions.requestFetchRoles();
     this.props.actions.requestFetchUsers();
+    this.props.actions.requestFetchDisplayItems()
   }
 
   componentWillReceiveProps(nextProps) {
@@ -270,9 +271,16 @@ class FileDetailContainer extends Component {
 
   renderMetaInfos = () => {
     const render = (meta, idx) => {
-      const value = meta.value_type === "Date"
-            ? moment(meta.value).format("YYYY-MM-DD HH:mm")
-            : meta.value;
+      let value
+      if (meta.value_type === "Date") {
+        if (meta.date_format === undefined) {
+          value = moment(meta.value).format("YYYY-MM-DD HH:mm")
+        } else {
+          value = moment(meta.value).format(meta.date_format)
+        }
+      } else {
+        value = meta.value
+      }
 
       return (
         <div key={idx} style={styles.metaRow}>
@@ -444,6 +452,20 @@ const mapStateToProps = (state, ownProps) => {
         ? state.files.filter( file => (
           file._id === ownProps.match.params.id ))[0]
         : {};
+
+  if (get(file, 'meta_infos') !== undefined && state.displayItems.length > 0) {
+    file.meta_infos = file.meta_infos.map( meta => {
+      if (meta.value_type === "Date") {
+        const displayItem = find(state.displayItems, { meta_info_id: meta._id })
+        if (displayItem !== undefined && displayItem.date_format !== undefined) {
+          meta.date_format = displayItem.date_format
+        }
+        return meta
+      } else {
+        return meta
+      }
+    })
+  }
 
   return {
     file: file,

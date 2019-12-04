@@ -129,3 +129,6 @@ export const LIBRE_OFFICE_PATH = () => {
   fs.statSync(librePath); // 存在しなければ例外をスローする
   return librePath;
 };
+
+// アップロード時、同階層に同名のファイルが存在した場合、上書きするかどうか？
+export const ALLOW_FILE_OVERRIDE = 'allow_file_override';

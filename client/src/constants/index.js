@@ -38,3 +38,7 @@ export const LIST_SEARCH_DETAIL = "LIST_SEARCH_DETAIL";
 // apiのタイムアウト時間(ミリsec)
 export const DEFAULT_API_TIMEOUT = 10 * 1000;
 export const PREVIEW_API_TIMEOUT = 20 * 1000;
+
+// excelダウンロードの上限件数
+export const DOWNLOAD_XLSX_LIMIT_COUNT = 100;
+
