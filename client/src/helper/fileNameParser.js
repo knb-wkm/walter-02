@@ -1,6 +1,6 @@
 import * as moment from "moment";
-
 import { find } from "lodash";
+import mime from 'mime';
 
 export const createFileName = (file,format) => {
   let rep = [];
@@ -42,5 +42,12 @@ export const createFileName = (file,format) => {
     }
   });
 
-  return replaced === rep["{extension}"] ? file.name : replaced;　// 拡張子以外未定義の場合は元のファイル名を返す
+  const result = rep["{extension}"] ? file.name : replaced;　// 拡張子以外未定義の場合は元のファイル名を返す
+
+  if (result.split(".").length > 1) {
+    return result;
+  } else {
+    const extension = mime.getExtension(file.mime_type);
+    return result + "." + extension;
+  }
 };
