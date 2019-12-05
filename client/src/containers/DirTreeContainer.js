@@ -17,6 +17,7 @@ import { requestFetchDirTree, selectDirTree } from "../actions";
 class DirTreeContainer extends Component {
   componentWillMount() {
     this.props.requestFetchDirTree(this.props.tenant.dirId);
+    this.props.selectDirTree({ _id: this.props.tenant.dirId });
   }
 
   renderDirTree = (node, idx) => {

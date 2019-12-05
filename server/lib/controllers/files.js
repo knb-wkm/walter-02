@@ -935,6 +935,15 @@ export const searchDetail = (req, res, next, export_excel=false) => {
 
         // タグ @todo elasticsearchにindex化されていない
 
+        // お気に入り
+        if (q.name === "favorite" && q.value_type === "Bool") {
+          return {
+            match: {
+              "file.is_star": q.value
+            }
+          }
+        }
+
         // メタ情報以外の文字列
         return {
           query_string: {
