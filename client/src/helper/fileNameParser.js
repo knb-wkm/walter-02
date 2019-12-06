@@ -1,6 +1,7 @@
 import * as moment from "moment";
 import { find } from "lodash";
 import mime from 'mime';
+import * as constants from '../constants'
 
 export const createFileName = (file,format) => {
   let rep = [];
@@ -42,7 +43,11 @@ export const createFileName = (file,format) => {
     }
   });
 
-  const result = rep["{extension}"] ? file.name : replaced;　// 拡張子以外未定義の場合は元のファイル名を返す
+  let result = rep["{extension}"] ? file.name : replaced;　// 拡張子以外未定義の場合は元のファイル名を返す
+
+  // NTFSの禁則文字を除外
+  const replaceTargets = new RegExp(constants.ILLIGAL_CHARACTERS.join("|"), "g");
+  result = result.replace(replaceTargets, "")
 
   if (result.split(".").length > 1) {
     return result;
