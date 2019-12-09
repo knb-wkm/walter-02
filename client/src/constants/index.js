@@ -40,7 +40,7 @@ export const DEFAULT_API_TIMEOUT = 10 * 1000;
 export const PREVIEW_API_TIMEOUT = 20 * 1000;
 
 // excelダウンロードの上限件数
-export const DOWNLOAD_XLSX_LIMIT_COUNT = 100;
+export const DOWNLOAD_XLSX_LIMIT_COUNT = 300;
 
 // 禁止文字一覧
 // 使い方: string.match( new RegExp(ILLIGAL_CHARACTERS.join("|")))

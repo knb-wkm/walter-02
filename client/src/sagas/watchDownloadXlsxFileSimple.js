@@ -14,22 +14,20 @@ function* watchDownloadXlsxFileSimple() {
   while (true) {
     yield take(actions.downloadXlsxFileSimple().type);
     const {total} = yield select( state => state.filePagination );
-    if (total >= DOWNLOAD_XLSX_LIMIT_COUNT) {
-      yield put(commons.openException(`ファイルの件数が${total}を超過しているため一覧のダウンロードに失敗しました`));
-      yield cancel();
-    }
-
     const api = new API();
 
     // 非表示ファイルを取得するか
     const isDisplayUnvisible = yield call(isDisplayUnvisibleSetting);
 
     try {
+      yield put(commons.loadingStart());
+      if (total >= DOWNLOAD_XLSX_LIMIT_COUNT) {
+        throw new Error("DOWNLOAD_XLSX_LIMIT_OVER_EXCEPTION");
+      }
+
       const { value } = yield select( state => state.fileSimpleSearch.search_value );
       const { page } = yield select( state => state.filePagination );
       const { sorted, desc } = yield select( state => state.fileSortTarget );
-
-      yield put(commons.loadingStart());
       const payload = yield call(api.downloadXlsxFileSimple, value, page, sorted, desc, isDisplayUnvisible);
 
       const download = new Blob(
@@ -39,7 +37,11 @@ function* watchDownloadXlsxFileSimple() {
       yield saveAs(download, "list.xlsx");
     }
     catch (e) {
-      yield put(commons.openException("ファイルのダウンロードに失敗しました"));
+      if (e.message === "DOWNLOAD_XLSX_LIMIT_OVER_EXCEPTION") {
+        yield put(commons.openException(`ファイルの件数が${DOWNLOAD_XLSX_LIMIT_COUNT}を超過しているため一覧のダウンロードに失敗しました`));
+      } else {
+        yield put(commons.openException("ファイルのダウンロードに失敗しました"));
+      }
     }
     finally {
       yield put(commons.loadingEnd());
