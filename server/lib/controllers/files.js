@@ -874,8 +874,8 @@ export const searchDetail = (req, res, next, export_excel=false) => {
             between.gte = null;
           }
 
-          if ( q.value.lt !== undefined && q.value.gt !== null && q.value.gt !== "" ) {
-            between.lte = moment( q.value.lt ).add(1,"days").utc();
+          if ( q.value.lt !== undefined && q.value.lt !== null && q.value.lt !== "" ) {
+            between.lte = moment( q.value.lt ).add(1,"minutes").utc();
           } else {
             between.lte = null;
           }
@@ -911,27 +911,6 @@ export const searchDetail = (req, res, next, export_excel=false) => {
 
         // 更新日時などメタ情報以外の日付範囲
         // @todo elasticsearchでindex化されていない
-        if (q.value_type === "Date" && q.between) {
-          const between = {};
-
-          if ( q.value.gt !== undefined && q.value.gt !== null && q.value.gt !== "" ) {
-            between.gte = moment( q.value.gt ).utc();
-          } else {
-            between.gte = null;
-          }
-
-          if ( q.value.lt !== undefined && q.value.gt !== null && q.value.gt !== "" ) {
-            between.lte = moment( q.value.lt ).add(1,"days").utc();
-          } else {
-            between.lte = null;
-          }
-
-          return {
-            range: {
-              [`file.${q.name}`]: between
-            }
-          };
-        }
 
         // タグ @todo elasticsearchにindex化されていない
 
