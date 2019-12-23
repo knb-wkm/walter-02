@@ -25,6 +25,8 @@ function* watchDownloadFile() {
       yield saveAs(download, file_name);
     }
     catch (e) {
+      console.error(e);
+      console.exception(e);
       yield put(commons.openException("ファイルのダウンロードに失敗しました" ));
     }
     finally {
