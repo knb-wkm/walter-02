@@ -85,7 +85,7 @@ class LoginContainer extends Component {
                 <TextField
                   ref="account_name"
                   onKeyDown={this.handleKeyDown}
-                  hintText="example"
+                  hintText="ユーザIDを入力"
                   floatingLabelText="ユーザID"
                   errorText={this.props.session.errors.account_name}
                   style={styles.text} />
@@ -95,6 +95,7 @@ class LoginContainer extends Component {
                 <TextField
                   ref="password"
                   onKeyDown={this.handleKeyDown}
+                  hintText="パスワードを入力"
                   floatingLabelText="パスワード"
                   errorText={this.props.session.errors.password}
                   style={styles.text}
