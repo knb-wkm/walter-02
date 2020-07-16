@@ -37,7 +37,7 @@
     "express": "4.15.5",
     "jade": "1.11.0",
     "jsonwebtoken": "7.4.3",
-    "lodash": "4.17.4",
+    "lodash": "4.17.19",
     "log4js": "4.0.2",
     "moment": "2.20.1",
     "mongodb": "2.2.34",
