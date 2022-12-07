@@ -34,7 +34,7 @@
     "debug": "2.6.9",
     "elasticsearch": "14.0.0",
     "exceljs": "0.7.1",
-    "express": "4.15.5",
+    "express": "4.17.3",
     "jade": "1.11.0",
     "jsonwebtoken": "7.4.3",
     "lodash": "4.17.4",
